@@ -141,7 +141,7 @@ def parse_fimo_output(path, sequences, ind_to_motif, q_val_thres):
 
 # function to detect the Vierstra motifs in the sequences
 def detect_vierstra_motifs_in_sequences(input_sequences, description, root_save_dir, vierstra_motifs_data_dir, \
-                                        q_val_thres=0.05, num_cores=-1, both_strands=True, fimo_cmd_path="fimo"):
+                                        q_val_thres=0.01, num_cores=-1, both_strands=True, fimo_cmd_path="fimo"):
     motifs_file = os.path.join(vierstra_motifs_data_dir, "pfm_meme.txt")
     if not os.path.exists(motifs_file):
         download_vierstra_motifs(vierstra_motifs_data_dir)
