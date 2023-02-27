@@ -3,9 +3,17 @@
 The code base for our work on building accurate models of promoter-driven gene expression by leveraging existing genomic data. We explain how to reproduce our results in detail and also point to our best models and preprocessed data. Please cite this work if you use our code or data:
 
 ```bibtex
-@article{reddyherschletal2023,
-         title={Pretraining strategies for effective promoter-driven gene expression prediction}
-         year={2023}}
+@article {reddyherschletal2023,
+	author = {Reddy, Aniketh Janardhan and Herschl, Michael H and Kolli, Sathvik and Lu, Amy X and Geng, Xinyang and Kumar, Aviral and Hsu, Patrick D and Levine, Sergey and Ioannidis, Nilah M},
+	title = {Pretraining strategies for effective promoter-driven gene expression prediction},
+	elocation-id = {2023.02.24.529941},
+	year = {2023},
+	doi = {10.1101/2023.02.24.529941},
+	publisher = {Cold Spring Harbor Laboratory},
+	URL = {https://www.biorxiv.org/content/early/2023/02/27/2023.02.24.529941},
+	eprint = {https://www.biorxiv.org/content/early/2023/02/27/2023.02.24.529941.full.pdf},
+	journal = {bioRxiv}
+}
 ```
 
 We give the complete list of commands needed to reproduce our main modelling results using this code base. 
