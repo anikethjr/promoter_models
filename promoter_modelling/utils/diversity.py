@@ -45,7 +45,7 @@ def compute_average_pairwise_gapped_kmer_occurrences_similarity(sequences, kmer_
 
 def compute_average_pairwise_vierstra_motif_occurrences_similarity(sequences, vierstra_motifs_data_dir, \
                                                                    fimo_outputs_save_dir="./temp_fimo_outputs", description="temp", \
-                                                                   q_val_thres=0.05, num_cores=-1, both_strands=True, fimo_cmd_path="fimo"):
+                                                                   q_val_thres=0.01, num_cores=-1, both_strands=True, fimo_cmd_path="fimo"):
     """
     Computes the average pairwise similarity between sequences using the Vierstra motifs.
     Also returns the average number of motif occurrences detected in each sequence and the average number of unique motifs detected in each sequence.
