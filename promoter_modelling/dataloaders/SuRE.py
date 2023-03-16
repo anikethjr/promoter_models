@@ -364,7 +364,7 @@ def subsample_sequences_based_on_GC_content(all_files, \
 
 # class to create batches for SuRE data
 class SuREDataset(Dataset):
-    def __init__(self, path_to_x, split_name, num_outputs, num_classes_per_output, output_names, task):
+    def __init__(self, path_to_x, split_name, num_outputs, num_classes_per_output, output_names, task, shrink_set=False):
         super().__init__()
 
         self.split_name = split_name
@@ -374,6 +374,9 @@ class SuREDataset(Dataset):
         self.x = pd.read_csv(path_to_x, sep="\t")        
         self.num_windows = 1
         self.task = task
+        
+        if shrink_set:
+            self.x = self.x.iloc[0:10]
         
     def __len__(self):
         return self.x.shape[0]
@@ -493,7 +496,8 @@ class SuREDataLoader(pl.LightningDataModule):
                  num_train=250000*3, \
                  num_val=25000*3, \
                  num_test=25000*3, \
-                 use_cache = True):
+                 use_cache = True, \
+                 shrink_test_set=False):
 
         super().__init__()
         
@@ -664,10 +668,10 @@ class SuREDataLoader(pl.LightningDataModule):
         self.train_dataset = SuREDataset(self.train_set, "train", self.num_outputs, self.num_classes_per_output, self.output_names, self.task)
         
         print("Creating test dataset")
-        self.test_dataset = SuREDataset(self.test_set, "test", self.num_outputs, self.num_classes_per_output, self.output_names, self.task)
+        self.test_dataset = SuREDataset(self.test_set, "test", self.num_outputs, self.num_classes_per_output, self.output_names, self.task, shrink_set=shrink_test_set)
         
         print("Creating val dataset")
-        self.val_dataset = SuREDataset(self.val_set, "val", self.num_outputs, self.num_classes_per_output, self.output_names, self.task)
+        self.val_dataset = SuREDataset(self.val_set, "val", self.num_outputs, self.num_classes_per_output, self.output_names, self.task, shrink_set=shrink_test_set)
         
         self.num_train = len(self.train_dataset)
         self.num_val = len(self.val_dataset)
