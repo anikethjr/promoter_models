@@ -1,10 +1,26 @@
 # Pretraining strategies for effective promoter-driven gene expression prediction
 
+The code base for our work on building accurate models of promoter-driven gene expression by leveraging existing genomic data. We explain how to reproduce our results in detail and also point to our best models and preprocessed data. Please cite this work if you use our code or data:
+
+```bibtex
+@article {reddyherschletal2023,
+	author = {Reddy, Aniketh Janardhan and Herschl, Michael H and Kolli, Sathvik and Lu, Amy X and Geng, Xinyang and Kumar, Aviral and Hsu, Patrick D and Levine, Sergey and Ioannidis, Nilah M},
+	title = {Pretraining strategies for effective promoter-driven gene expression prediction},
+	elocation-id = {2023.02.24.529941},
+	year = {2023},
+	doi = {10.1101/2023.02.24.529941},
+	publisher = {Cold Spring Harbor Laboratory},
+	URL = {https://www.biorxiv.org/content/early/2023/02/27/2023.02.24.529941},
+	eprint = {https://www.biorxiv.org/content/early/2023/02/27/2023.02.24.529941.full.pdf},
+	journal = {bioRxiv}
+}
+```
+
 We give the complete list of commands needed to reproduce our main modelling results using this code base. 
 
 By default, the modelling results and data are stored in the same directory as the code (./results and ./data respectively). Please change the config.json file if they are to be stored elsewhere. 
 
-Our dataloaders are designed to download the necessary raw data files from the internet or an anonymous Google Drive. However, the raw ENCODE TF-binding data files need to be manually downloaded due to their size from here - https://drive.google.com/file/d/1VLVjRf3nFLSYEamTKm_zN5cObdS1BJc3/view?usp=share_link. Then, extract them to a subdirectory of the data directory called "ENCODETFChIPSeq_data".
+Our dataloaders are designed to download the necessary raw data files from the internet or a Google Drive. However, the raw ENCODE TF-binding data files need to be manually downloaded due to their size from here - https://drive.google.com/file/d/1VLVjRf3nFLSYEamTKm_zN5cObdS1BJc3/view?usp=share_link. Then, extract them to a subdirectory of the data directory called "ENCODETFChIPSeq_data".
 
 Now, downloading the raw data files and preprocessing them is a time-consuming task, especially for the larger datasets. Thus, we provide a folder containing most of the preprocessed data here - https://drive.google.com/file/d/1Cs0KamYJy-qq3HaPsUMNoe6j8IB1QCJV/view?usp=share_link. Simply extract the contents of this file to the data directory.
 
@@ -14,7 +30,7 @@ We also provide the best model checkpoints for the pretrained and jointly traine
 
 ### Install the package:
 
-Run the following command while inside the downloaded folder:
+Run the following commands to install the package:
 ```
 python -m pip install -e .
 ```
