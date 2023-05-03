@@ -20,7 +20,7 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq
+from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, lentiMPRA
 from promoter_modelling import backbone_modules
 from promoter_modelling import MTL_modules
 
@@ -120,6 +120,10 @@ def get_predictions(args, config, finetune=False):
                                                                                         datasets_save_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq_data"), \
                                                                                         shrink_test_set=args.shrink_test_set, \
                                                                                         fasta_shuffle_letters_path=args.fasta_shuffle_letters_path))
+                elif t == "lentiMPRA":
+                    dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=args.batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
+                                                                            common_cache_dir=common_cache_dir))
                 elif t == "FluorescenceData":
                     dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData")))
@@ -172,6 +176,10 @@ def get_predictions(args, config, finetune=False):
                                                                         datasets_save_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq_data"), \
                                                                         shrink_test_set=args.shrink_test_set, \
                                                                         fasta_shuffle_letters_path=args.fasta_shuffle_letters_path)
+        elif task == "lentiMPRA":
+            dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=args.batch_size, \
+                                                                cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
+                                                                common_cache_dir=common_cache_dir)
         elif task == "FluorescenceData":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"))
