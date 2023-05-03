@@ -15,6 +15,8 @@ import pytorch_lightning as pl
 
 import torchmetrics
 
+from transformers import AutoTokenizer, AutoModel
+
 from promoter_modelling.utils import fasta_utils
 
 np.random.seed(97)
@@ -53,19 +55,31 @@ class FluorescenceDataset(Dataset):
         self.num_cells = num_cells
         self.cell_names = cell_names
                 
-        # create/load one-hot encoded input sequences
+        # create/load encoded input sequences
         if use_cache and os.path.exists(os.path.join(cache_dir, "{}_seqs.npy".format(split_name))):
             self.all_seqs = np.load(os.path.join(cache_dir, "{}_seqs.npy".format(split_name)))
-            print("Loaded cached one-hot encoded sequences, shape = {}".format(self.all_seqs.shape))
+            print("Loaded cached encoded sequences, shape = {}".format(self.all_seqs.shape))
         else:
-            print("Creating one-hot encoded sequences")
+            print("Creating encoded sequences")
+
+            # load DNABERT tokenizer
+            tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNA_bert_6")
+
             self.all_seqs = []
             for i in tqdm(range(self.df.shape[0])):
                 row = df.iloc[i]
                 promoter_seq = row["sequence"]
-                onehot_seq = fasta_utils.one_hot_encode(promoter_seq).astype(np.float32)                  
-                self.all_seqs.append(onehot_seq)
-            self.all_seqs = np.array(self.all_seqs)
+
+                hexamer_seq = ""
+                for j in range(len(promoter_seq) - 6 + 1):
+                    hexamer_seq = hexamer_seq + promoter_seq[j: j + 6] + " "
+                hexamer_seq = hexamer_seq[:-1]
+
+                # encode sequence
+                encoded_seq = tokenizer.encode(hexamer_seq, add_special_tokens=True, return_tensors="np")
+                self.all_seqs.append(encoded_seq)
+
+            self.all_seqs = np.array(self.all_seqs).squeeze(1)
             np.save(os.path.join(cache_dir, "{}_seqs.npy".format(split_name)), self.all_seqs)
             print("Done! Shape = {}".format(self.all_seqs.shape))
         
@@ -128,7 +142,7 @@ class FluorescenceDataLoader(pl.LightningDataModule):
                  min_reads = 5, \
                  train_fraction = 0.7, \
                  val_fraction = 0.1, \
-                 zscore = False, \
+                 zscore = True, \
                  use_cache = True, \
                  return_specified_cells = None, \
                  predict_DE = False):
@@ -193,14 +207,6 @@ class FluorescenceDataLoader(pl.LightningDataModule):
                 if col.endswith("_sum") and col != "cum_sum":
                     self.measurements["keep"] = self.measurements["keep"] & (self.measurements[col] >= min_reads)
             self.measurements = self.measurements[self.measurements["keep"]].drop("keep", axis=1).reset_index(drop=True)
-
-            # divide the read counts by the total number of reads across sequences
-            for col in self.measurements.columns:
-                if not (col.endswith("_sum") or col == "sequence"):
-                    print("Normalizing {}, sum before = {}".format(col, self.measurements[col].sum()))
-                    self.measurements[col] = self.measurements[col] + 1.0 # pseudocount
-                    self.measurements[col] = self.measurements[col] / self.measurements[col].sum() # normalize
-                    print("After normalizing {}, sum = {}".format(col, self.measurements[col].sum()))
             
             for cell in self.cell_names:
                 first_letter_of_cell_name = cell[:1]
@@ -211,15 +217,15 @@ class FluorescenceDataLoader(pl.LightningDataModule):
                         other_cells_first_letters = [c[:1] for c in other_cells]
                         avg_ratio = 0
                         for other_cell, other_cell_first_letter in zip(other_cells, other_cells_first_letters):
-                            avg_ratio += (self.measurements["{}{}_P4".format(other_cell_first_letter, rep+1)]) / (self.measurements["{}{}_P7".format(other_cell_first_letter, rep+1)])
+                            avg_ratio += (self.measurements["{}{}_P4".format(other_cell_first_letter, rep+1)] + 1) / (self.measurements["{}{}_P7".format(other_cell_first_letter, rep+1)] + 1)
                         avg_ratio /= len(other_cells)
 
-                        cur_ratio = (self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)]) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)])
+                        cur_ratio = (self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)] + 1) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)] + 1)
 
                         # DE = ratio of P4 to P7 in cell of interest / ratio of P4 to P7 in other cells
                         self.measurements[cell] += np.log2(cur_ratio / avg_ratio)
                     else:
-                        self.measurements[cell] += np.log2((self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)]) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)]))
+                        self.measurements[cell] += np.log2((self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)] + 1) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)] + 1))
                 self.measurements[cell] /= self.num_replicates
 
             if self.zscore:
@@ -320,9 +326,6 @@ class FluorescenceDataLoader(pl.LightningDataModule):
         print("Creating val dataset")
         self.val_dataset = FluorescenceDataset(self.val_set, "val", self.num_cells, self.cell_names, \
                                                cache_dir=self.cache_dir, use_cache=use_cache)
-        print("Creating full dataset")
-        self.full_dataset = FluorescenceDataset(self.merged, "full", self.num_cells, self.cell_names, \
-                                                cache_dir=self.cache_dir, use_cache=use_cache)
         
         print("Train set has {} promoter-expression pairs from {} total pairs ({:.2f}% of dataset)".format(len(self.train_dataset), \
                                                                                                            self.merged.shape[0], \
@@ -333,9 +336,7 @@ class FluorescenceDataLoader(pl.LightningDataModule):
         print("Val set has {} promoter-expression data from {} total pairs ({:.2f}% of dataset)".format(len(self.val_dataset), \
                                                                                                         self.merged.shape[0], \
                                                                                                         100.0*self.val_set.shape[0]/self.merged.shape[0]))
-        print("Full set has {} promoter-expression data from {} total pairs ({:.2f}% of dataset)".format(len(self.full_dataset), \
-                                                                                                            self.merged.shape[0], \
-                                                                                                            100.0*self.merged.shape[0]/self.merged.shape[0]))
+        
         print("Completed Instantiation of Fluorescence DataLoader")        
     
     def train_dataloader(self):
@@ -349,6 +350,3 @@ class FluorescenceDataLoader(pl.LightningDataModule):
     
     def predict_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.n_cpus, pin_memory=True)
-    
-    def full_dataloader(self):
-        return DataLoader(self.full_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.n_cpus, pin_memory=True)

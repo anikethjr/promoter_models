@@ -8,7 +8,7 @@ import h5py
 import json
 from tqdm import tqdm
 import scipy.stats as stats
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, accuracy_score, precision_score, recall_score, f1_score
 
 import torch
 
@@ -17,7 +17,8 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from promoter_modelling.dataloaders import FluorescenceData, FluorescenceData_with_motifs, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq
+from promoter_modelling.dataloaders import FluorescenceData, FluorescenceData_classification, FluorescenceData_with_motifs, FluorescenceData_DNABERT, \
+                                           LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq
 from promoter_modelling import backbone_modules
 from promoter_modelling import MTL_modules
 
@@ -65,9 +66,9 @@ def train_model(args, config, finetune=False):
     else:
         raise ValueError("Invalid modelling strategy")
 
-    if args.model_name == "MotifBasedFCN":
-        assert len(tasks) == 1, "MotifBasedFCN can only be trained on a single task"
-        assert tasks[0] == "FluorescenceData" or tasks[0] == "FluorescenceData_DE", "MotifBasedFCN can only be trained on FluorescenceData or FluorescenceData_DE"
+    if args.model_name.startswith("MotifBased"):
+        assert len(tasks) == 1, "Motif-based models can only be trained on a single task"
+        assert tasks[0] == "FluorescenceData" or tasks[0] == "FluorescenceData_DE", "Motif-based models can only be trained on FluorescenceData or FluorescenceData_DE"
 
     dataloaders = {}
     print("Instantiating dataloaders...")
@@ -128,21 +129,31 @@ def train_model(args, config, finetune=False):
                                                                                         shrink_test_set=args.shrink_test_set, \
                                                                                         fasta_shuffle_letters_path=args.fasta_shuffle_letters_path))
                 elif t == "FluorescenceData":
-                    if args.model_name == "MotifBasedFCN":
+                    if args.model_name.startswith("MotifBased"):
                         dataloaders[task].append(FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                                                      cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs")))
+                    elif "DNABERT" in args.model_name:
+                        dataloaders[task].append(FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                                                     cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT")))
                     else:
                         dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData")))
                 elif t == "FluorescenceData_DE":
-                    if args.model_name == "MotifBasedFCN":
+                    if args.model_name.startswith("MotifBased"):
                         dataloaders[task].append(FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                                                      cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs_DE"), \
+                                                                                                     predict_DE=True))
+                    elif "DNABERT" in args.model_name:
+                        dataloaders[task].append(FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                                                     cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT_DE"), \
                                                                                                      predict_DE=True))
                     else:
                         dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
                                                                                         predict_DE=True))
+                elif t == "FluorescenceData_classification":
+                    dataloaders[task].append(FluorescenceData_classification.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                                                    cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification")))
         elif task == "LL100":
             dataloaders[task] = LL100.LL100DataLoader(batch_size=args.batch_size, \
                                                         cache_dir=os.path.join(root_data_dir, "LL-100"), \
@@ -186,21 +197,31 @@ def train_model(args, config, finetune=False):
                                                                         shrink_test_set=args.shrink_test_set, \
                                                                         fasta_shuffle_letters_path=args.fasta_shuffle_letters_path)
         elif task == "FluorescenceData":
-            if args.model_name == "MotifBasedFCN":
+            if args.model_name.startswith("MotifBased"):
                 dataloaders[task] = FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs"))
+            elif "DNABERT" in args.model_name:
+                dataloaders[task] = FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT"))
             else:
                 dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "FluorescenceData"))
         elif task == "FluorescenceData_DE":
-            if args.model_name == "MotifBasedFCN":
+            if args.model_name.startswith("MotifBased"):
                 dataloaders[task] = FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs_DE"), \
+                                                                                        predict_DE=True)
+            elif "DNABERT" in args.model_name:
+                dataloaders[task] = FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT_DE"), \
                                                                                         predict_DE=True)
             else:
                 dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
                                                                             predict_DE=True)
+        elif task == "FluorescenceData_classification":
+            dataloaders[task] = FluorescenceData_classification.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification"))
         elif task == "FluorescenceData_JURKAT":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
@@ -306,16 +327,47 @@ def train_model(args, config, finetune=False):
     elif args.model_name == "PureCNN":
         model_class = backbone_modules.PureCNN
         name_format = "PureCNN_" + name_format
+    elif args.model_name == "PureCNNLarge":
+        model_class = backbone_modules.PureCNNLarge
+        name_format = "PureCNNLarge_" + name_format
+    elif args.model_name == "ResNet":
+        model_class = backbone_modules.ResNet
+        name_format = "ResNet_" + name_format
     elif args.model_name == "MotifBasedFCN":
         model_class = backbone_modules.MotifBasedFCN
         name_format = "MotifBasedFCN_" + name_format
+    elif args.model_name == "MotifBasedFCNLarge":
+        model_class = backbone_modules.MotifBasedFCNLarge
+        name_format = "MotifBasedFCNLarge_" + name_format
+    elif args.model_name == "DNABERT":
+        model_class = backbone_modules.DNABERT
+        name_format = "DNABERT_" + name_format
+    elif args.model_name == "LegNet":
+        model_class = backbone_modules.LegNet
+        name_format = "LegNet_" + name_format
+    elif args.model_name == "LegNetLarge":
+        model_class = backbone_modules.LegNetLarge
+        name_format = "LegNetLarge_" + name_format
     else:
-        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN' or 'MotifBasedFCN'")
+        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
 
     # train models
     all_seeds_r2 = {}
     all_seeds_pearsonr = {}
     all_seeds_srho = {}
+
+    all_seeds_accuracy = {}
+    all_seeds_precision = {}
+    all_seeds_recall = {}
+    all_seeds_f1 = {}
+
+    percentile_thres = 90
+    all_seeds_highly_expressed_accuracy = {}
+    all_seeds_highly_expressed_precision = {}
+    all_seeds_highly_expressed_recall = {}
+    all_seeds_highly_expressed_f1 = {}
+    all_seeds_lowly_expressed_accuracy = {}
+
     for seed in range(num_models_to_train):
         if num_models_to_train > 1:
             print("Random seed = {}".format(seed))
@@ -325,7 +377,7 @@ def train_model(args, config, finetune=False):
 
             for i in range(len(all_dataloaders)):
                 if all_dataloaders[i].name.startswith("Fluorescence"):
-                    if args.model_name == "MotifBasedFCN":
+                    if args.model_name.startswith("MotifBased"):
                         if all_dataloaders[i].predict_DE:
                             all_dataloaders[i] = FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                                  cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs_DE"), \
@@ -335,6 +387,30 @@ def train_model(args, config, finetune=False):
                         else:
                             all_dataloaders[i] = FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                                     cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs"), \
+                                                                                    seed=seed, \
+                                                                                    return_specified_cells=all_dataloaders[i].return_specified_cells)
+                    elif "DNABERT" in args.model_name:
+                        if all_dataloaders[i].predict_DE:
+                            all_dataloaders[i] = FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                                    cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT_DE"), \
+                                                                                    seed=seed, \
+                                                                                    return_specified_cells=all_dataloaders[i].return_specified_cells, \
+                                                                                    predict_DE=True)
+                        else:
+                            all_dataloaders[i] = FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                                    cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT"), \
+                                                                                    seed=seed, \
+                                                                                    return_specified_cells=all_dataloaders[i].return_specified_cells)
+                    elif "classification" in all_dataloaders[i].name:
+                        if all_dataloaders[i].predict_DE:
+                            all_dataloaders[i] = FluorescenceData_classification.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                                    cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification"), \
+                                                                                    seed=seed, \
+                                                                                    return_specified_cells=all_dataloaders[i].return_specified_cells, \
+                                                                                    predict_DE=True)
+                        else:
+                            all_dataloaders[i] = FluorescenceData_classification.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                                    cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification"), \
                                                                                     seed=seed, \
                                                                                     return_specified_cells=all_dataloaders[i].return_specified_cells)
                     else:
@@ -354,10 +430,11 @@ def train_model(args, config, finetune=False):
         else:
             name = name_format
 
-        if args.model_name == "MotifBasedFCN":
+        if args.model_name.startswith("MotifBased"):
             mtlpredictor = MTL_modules.MTLPredictor(model_class=model_class,\
                                                 all_dataloader_modules=all_dataloaders, \
                                                 batch_size=args.batch_size, \
+                                                max_epochs=args.max_epochs, \
                                                 lr=lr, \
                                                 weight_decay=weight_decay, \
                                                 with_motifs=True, \
@@ -367,6 +444,7 @@ def train_model(args, config, finetune=False):
             mtlpredictor = MTL_modules.MTLPredictor(model_class=model_class,\
                                                 all_dataloader_modules=all_dataloaders, \
                                                 batch_size=args.batch_size, \
+                                                max_epochs=args.max_epochs, \
                                                 lr=lr, \
                                                 weight_decay=weight_decay, \
                                                 use_preconstructed_dataloaders=True, \
@@ -496,7 +574,85 @@ def train_model(args, config, finetune=False):
             print("y shape = {}".format(dataloader_to_y[dl].shape))
             print("pred shape = {}".format(dataloader_to_pred[dl].shape))
 
-            if "Fluorescence" in dl:
+            if "Fluorescence" in dl and "classification" in dl:
+                print()
+                for j, output in enumerate(all_dataloaders[i].output_names):
+                    cur_y = dataloader_to_y[dl][:, j]
+                    cur_pred = dataloader_to_pred[dl][:, j]
+
+                    # apply sigmoid and round
+                    cur_pred = torch.sigmoid(cur_pred)
+                    cur_pred = torch.round(cur_pred)
+
+                    # get overall metrics
+                    acc = accuracy_score(cur_y, cur_pred)
+                    f1 = f1_score(cur_y, cur_pred)
+                    precision = precision_score(cur_y, cur_pred)
+                    recall = recall_score(cur_y, cur_pred)
+
+                    # get metrics for highly expressed promoters
+                    test_set = all_dataloaders[i].test_set
+                    highly_expressed_promoters = test_set[test_set["numerical_{}".format(output)] >= np.percentile(test_set["numerical_{}".format(output)], percentile_thres)]
+                    highly_expressed_promoters_indices = highly_expressed_promoters.index.values
+                    print("Number of highly expressed promoters = {}".format(len(highly_expressed_promoters_indices)))
+                    highly_expressed_promoters_y = cur_y[highly_expressed_promoters_indices]
+                    highly_expressed_promoters_pred = cur_pred[highly_expressed_promoters_indices]
+
+                    acc_highly_expressed = accuracy_score(highly_expressed_promoters_y, highly_expressed_promoters_pred)
+                    f1_highly_expressed = f1_score(highly_expressed_promoters_y, highly_expressed_promoters_pred)
+                    precision_highly_expressed = precision_score(highly_expressed_promoters_y, highly_expressed_promoters_pred)
+                    recall_highly_expressed = recall_score(highly_expressed_promoters_y, highly_expressed_promoters_pred)
+
+                    # get metrics for lowly expressed promoters
+                    lowly_expressed_promoters = test_set[test_set["numerical_{}".format(output)] <= np.percentile(test_set["numerical_{}".format(output)], 100 - percentile_thres)]
+                    lowly_expressed_promoters_indices = lowly_expressed_promoters.index.values
+                    print("Number of lowly expressed promoters = {}".format(len(lowly_expressed_promoters_indices)))
+                    lowly_expressed_promoters_y = cur_y[lowly_expressed_promoters_indices]
+                    lowly_expressed_promoters_pred = cur_pred[lowly_expressed_promoters_indices]
+
+                    acc_lowly_expressed = accuracy_score(lowly_expressed_promoters_y, lowly_expressed_promoters_pred)
+
+                    print()
+                    print("{} Accuracy = {} ≈ {}".format(output, acc, np.around(acc, 4)))
+                    print("{} F1 = {} ≈ {}".format(output, f1, np.around(f1, 4)))
+                    print("{} Precision = {} ≈ {}".format(output, precision, np.around(precision, 4)))
+                    print("{} Recall = {} ≈ {}".format(output, recall, np.around(recall, 4)))
+                    print()
+
+                    print("{} Accuracy (highly expressed) = {} ≈ {}".format(output, acc_highly_expressed, np.around(acc_highly_expressed, 4)))
+                    print("{} F1 (highly expressed) = {} ≈ {}".format(output, f1_highly_expressed, np.around(f1_highly_expressed, 4)))
+                    print("{} Precision (highly expressed) = {} ≈ {}".format(output, precision_highly_expressed, np.around(precision_highly_expressed, 4)))
+                    print("{} Recall (highly expressed) = {} ≈ {}".format(output, recall_highly_expressed, np.around(recall_highly_expressed, 4)))
+                    print()
+
+                    print("{} Accuracy (lowly expressed) = {} ≈ {}".format(output, acc_lowly_expressed, np.around(acc_lowly_expressed, 4)))
+                    print()
+
+                    if output not in all_seeds_accuracy:
+                        all_seeds_accuracy[output] = []
+                        all_seeds_precision[output] = []
+                        all_seeds_recall[output] = []
+                        all_seeds_f1[output] = []
+
+                        all_seeds_highly_expressed_accuracy[output] = []
+                        all_seeds_highly_expressed_precision[output] = []
+                        all_seeds_highly_expressed_recall[output] = []
+                        all_seeds_highly_expressed_f1[output] = []
+
+                        all_seeds_lowly_expressed_accuracy[output] = []
+
+                    all_seeds_accuracy[output].append(acc)
+                    all_seeds_precision[output].append(precision)
+                    all_seeds_recall[output].append(recall)
+                    all_seeds_f1[output].append(f1)
+
+                    all_seeds_highly_expressed_accuracy[output].append(acc_highly_expressed)
+                    all_seeds_highly_expressed_precision[output].append(precision_highly_expressed)
+                    all_seeds_highly_expressed_recall[output].append(recall_highly_expressed)
+                    all_seeds_highly_expressed_f1[output].append(f1_highly_expressed)
+
+                    all_seeds_lowly_expressed_accuracy[output].append(acc_lowly_expressed)
+            elif "Fluorescence" in dl:
                 print()
                 for j, output in enumerate(all_dataloaders[i].output_names):
                     cur_y = dataloader_to_y[dl][:, j]
@@ -521,9 +677,100 @@ def train_model(args, config, finetune=False):
                     all_seeds_srho[output].append(srho)
     
     print()
-    if len(all_seeds_r2) > 0:
+    if len(all_seeds_r2) > 0 or len(all_seeds_accuracy) > 0:
         print("FINAL RESULTS ON FLUORESCENCE DATA")
         summary = vars(args)
+        for output in all_seeds_accuracy:
+            acc = np.average(all_seeds_accuracy[output])
+            precision = np.average(all_seeds_precision[output])
+            recall = np.average(all_seeds_recall[output])
+            f1 = np.average(all_seeds_f1[output])
+
+            acc_std = np.std(all_seeds_accuracy[output])
+            precision_std = np.std(all_seeds_precision[output])
+            recall_std = np.std(all_seeds_recall[output])
+            f1_std = np.std(all_seeds_f1[output])
+
+            print("{} avg Accuracy = {} +- {} ≈ {} +- {}".format(output, acc, acc_std, np.around(acc, 4), np.around(acc_std, 4)))
+            print("{} avg Precision = {} +- {} ≈ {} +- {}".format(output, precision, precision_std, np.around(precision, 4), np.around(precision_std, 4)))
+            print("{} avg Recall = {} +- {} ≈ {} +- {}".format(output, recall, recall_std, np.around(recall, 4), np.around(recall_std, 4)))
+            print("{} avg F1 = {} +- {} ≈ {} +- {}".format(output, f1, f1_std, np.around(f1, 4), np.around(f1_std, 4)))
+            print()
+
+            summary[output + "_all_Accuracy"] = all_seeds_accuracy[output]
+            summary[output + "_all_Precision"] = all_seeds_precision[output]
+            summary[output + "_all_Recall"] = all_seeds_recall[output]
+            summary[output + "_all_F1"] = all_seeds_f1[output]
+
+            summary[output + "_avg_Accuracy"] = acc
+            summary[output + "_avg_Precision"] = precision
+            summary[output + "_avg_Recall"] = recall
+            summary[output + "_avg_F1"] = f1
+
+            summary[output + "_std_Accuracy"] = acc_std
+            summary[output + "_std_Precision"] = precision_std
+            summary[output + "_std_Recall"] = recall_std
+            summary[output + "_std_F1"] = f1_std
+
+            summary[output + "_avg_Accuracy_disp"] = "{} +- {}".format(np.around(acc, 4), np.around(acc_std, 4))
+            summary[output + "_avg_Precision_disp"] = "{} +- {}".format(np.around(precision, 4), np.around(precision_std, 4))
+            summary[output + "_avg_Recall_disp"] = "{} +- {}".format(np.around(recall, 4), np.around(recall_std, 4))
+            summary[output + "_avg_F1_disp"] = "{} +- {}".format(np.around(f1, 4), np.around(f1_std, 4))
+
+
+        for output in all_seeds_highly_expressed_accuracy:
+            acc = np.average(all_seeds_highly_expressed_accuracy[output])
+            precision = np.average(all_seeds_highly_expressed_precision[output])
+            recall = np.average(all_seeds_highly_expressed_recall[output])
+            f1 = np.average(all_seeds_highly_expressed_f1[output])
+
+            acc_std = np.std(all_seeds_highly_expressed_accuracy[output])
+            precision_std = np.std(all_seeds_highly_expressed_precision[output])
+            recall_std = np.std(all_seeds_highly_expressed_recall[output])
+            f1_std = np.std(all_seeds_highly_expressed_f1[output])
+
+            print("{} avg Accuracy (highly expressed) = {} +- {} ≈ {} +- {}".format(output, acc, acc_std, np.around(acc, 4), np.around(acc_std, 4)))
+            print("{} avg Precision (highly expressed) = {} +- {} ≈ {} +- {}".format(output, precision, precision_std, np.around(precision, 4), np.around(precision_std, 4)))
+            print("{} avg Recall (highly expressed) = {} +- {} ≈ {} +- {}".format(output, recall, recall_std, np.around(recall, 4), np.around(recall_std, 4)))
+            print("{} avg F1 (highly expressed) = {} +- {} ≈ {} +- {}".format(output, f1, f1_std, np.around(f1, 4), np.around(f1_std, 4)))
+            print()
+
+            summary[output + "_all_Accuracy_highly_expressed"] = all_seeds_highly_expressed_accuracy[output]
+            summary[output + "_all_Precision_highly_expressed"] = all_seeds_highly_expressed_precision[output]
+            summary[output + "_all_Recall_highly_expressed"] = all_seeds_highly_expressed_recall[output]
+            summary[output + "_all_F1_highly_expressed"] = all_seeds_highly_expressed_f1[output]
+
+            summary[output + "_avg_Accuracy_highly_expressed"] = acc
+            summary[output + "_avg_Precision_highly_expressed"] = precision
+            summary[output + "_avg_Recall_highly_expressed"] = recall
+            summary[output + "_avg_F1_highly_expressed"] = f1
+
+            summary[output + "_std_Accuracy_highly_expressed"] = acc_std
+            summary[output + "_std_Precision_highly_expressed"] = precision_std
+            summary[output + "_std_Recall_highly_expressed"] = recall_std
+            summary[output + "_std_F1_highly_expressed"] = f1_std
+
+            summary[output + "_avg_Accuracy_highly_expressed_disp"] = "{} +- {}".format(np.around(acc, 4), np.around(acc_std, 4))
+            summary[output + "_avg_Precision_highly_expressed_disp"] = "{} +- {}".format(np.around(precision, 4), np.around(precision_std, 4))
+            summary[output + "_avg_Recall_highly_expressed_disp"] = "{} +- {}".format(np.around(recall, 4), np.around(recall_std, 4))
+            summary[output + "_avg_F1_highly_expressed_disp"] = "{} +- {}".format(np.around(f1, 4), np.around(f1_std, 4))
+
+        for output in all_seeds_lowly_expressed_accuracy:
+            acc = np.average(all_seeds_lowly_expressed_accuracy[output])
+
+            acc_std = np.std(all_seeds_lowly_expressed_accuracy[output])
+
+            print("{} avg Accuracy (lowly expressed) = {} +- {} ≈ {} +- {}".format(output, acc, acc_std, np.around(acc, 4), np.around(acc_std, 4)))
+            print()
+
+            summary[output + "_all_Accuracy_lowly_expressed"] = all_seeds_lowly_expressed_accuracy[output]
+
+            summary[output + "_avg_Accuracy_lowly_expressed"] = acc
+
+            summary[output + "_std_Accuracy_lowly_expressed"] = acc_std
+
+            summary[output + "_avg_Accuracy_lowly_expressed_disp"] = "{} +- {}".format(np.around(acc, 4), np.around(acc_std, 4))
+
         for output in all_seeds_r2:
             r2 = np.average(all_seeds_r2[output])
             pearsonr = np.average(all_seeds_pearsonr[output])
@@ -562,7 +809,7 @@ def train_model(args, config, finetune=False):
 
 args = argparse.ArgumentParser()
 args.add_argument("--config_path", type=str, default="./config.json", help="Path to config file")
-args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'PureCNN' or 'MotifBasedFCN'")
+args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
 args.add_argument("--modelling_strategy", type=str, required=True, help="Modelling strategy to use, either 'joint', 'pretrain+finetune', 'pretrain+linear_probing' or 'single_task'")
 
 args.add_argument("--joint_tasks", type=str, default=None, help="Comma separated list of tasks to jointly train on")

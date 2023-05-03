@@ -8,7 +8,7 @@ import h5py
 import json
 from tqdm import tqdm
 import scipy.stats as stats
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, accuracy_score, precision_score, recall_score, f1_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -19,12 +19,13 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq
+from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, FluorescenceData_classification, lentiMPRA
 from promoter_modelling import backbone_modules
 from promoter_modelling import MTL_modules
 
 np.random.seed(97)
 torch.manual_seed(97)
+torch.set_float32_matmul_precision('medium')
 
 def train_model(args, config, finetune=False):
     # create directories
@@ -125,6 +126,10 @@ def train_model(args, config, finetune=False):
                                                                                         datasets_save_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq_data"), \
                                                                                         shrink_test_set=args.shrink_test_set, \
                                                                                         fasta_shuffle_letters_path=args.fasta_shuffle_letters_path))
+                elif t == "lentiMPRA":
+                    dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=args.batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
+                                                                            common_cache_dir=common_cache_dir))
                 elif t == "FluorescenceData":
                     dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData")))
@@ -132,6 +137,9 @@ def train_model(args, config, finetune=False):
                     dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
                                                                         predict_DE=True))
+                elif t == "FluorescenceData_classification":
+                    dataloaders[task].append(FluorescenceData_classification.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification")))
         elif task == "LL100":
             dataloaders[task] = LL100.LL100DataLoader(batch_size=args.batch_size, \
                                                         cache_dir=os.path.join(root_data_dir, "LL-100"), \
@@ -174,6 +182,10 @@ def train_model(args, config, finetune=False):
                                                                         datasets_save_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq_data"), \
                                                                         shrink_test_set=args.shrink_test_set, \
                                                                         fasta_shuffle_letters_path=args.fasta_shuffle_letters_path)
+        elif task == "lentiMPRA":
+            dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=args.batch_size, \
+                                                                cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
+                                                                common_cache_dir=common_cache_dir)
         elif task == "FluorescenceData":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"))
@@ -181,6 +193,9 @@ def train_model(args, config, finetune=False):
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
                                                                         predict_DE=True)
+        elif task == "FluorescenceData_classification":
+            dataloaders[task] = FluorescenceData_classification.FluorescenceDataLoader(batch_size=args.batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification"))
         elif task == "FluorescenceData_JURKAT":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
@@ -284,8 +299,25 @@ def train_model(args, config, finetune=False):
     all_seeds_r2 = {}
     all_seeds_pearsonr = {}
     all_seeds_srho = {}    
+
+    percentile_threshold_for_highly_expressed_promoters = 90
+    percentile_threshold_for_lowly_expressed_promoters = 100 - percentile_threshold_for_highly_expressed_promoters
+
+    all_seeds_highly_expressed_promoters_r2 = {}
+    all_seeds_highly_expressed_promoters_pearsonr = {}
+    all_seeds_highly_expressed_promoters_srho = {}
+
+    all_seeds_lowly_expressed_promoters_r2 = {}
+    all_seeds_lowly_expressed_promoters_pearsonr = {}
+    all_seeds_lowly_expressed_promoters_srho = {}
+
+    all_seeds_extreme_expression_promoters_r2 = {}
+    all_seeds_extreme_expression_promoters_pearsonr = {}
+    all_seeds_extreme_expression_promoters_srho = {}
+
     all_seeds_y = {}
     all_seeds_pred = {}
+
     best_seed = None
     best_seed_val_metric = None
 
@@ -300,9 +332,9 @@ def train_model(args, config, finetune=False):
         else:
             name = name_format
 
-        mtlpredictor = MTL_modules.MTLPredictor(model_class=backbone_modules.MTLucifer,\
+        mtlpredictor = MTL_modules.MTLPredictor(model_class=backbone_modules.MTLuciferGN,\
                                                 all_dataloader_modules=all_dataloaders, \
-                                                batch_size=args.batch_size, \
+                                                batch_size=batch_size, \
                                                 lr=lr, \
                                                 weight_decay=weight_decay, \
                                                 use_preconstructed_dataloaders=True, \
@@ -357,7 +389,7 @@ def train_model(args, config, finetune=False):
             print("Loaded existing model")
             
             # get test set predictions
-            trainer = pl.Trainer(gpus=1)
+            trainer = pl.Trainer(accelerator="gpu", devices=1)
             best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader())
 
         else:
@@ -399,7 +431,8 @@ def train_model(args, config, finetune=False):
 
             trainer = pl.Trainer(logger=wandb_logger, \
                                 callbacks=[early_stop_callback, checkpoint_callback], \
-                                deterministic=True, gpus=1, \
+                                deterministic=True, \
+                                accelerator="gpu", devices=1, \
                                 log_every_n_steps=10, default_root_dir=model_save_dir, \
                                 max_epochs=max_epochs, \
                                 limit_test_batches=0, reload_dataloaders_every_n_epochs=2, enable_progress_bar = True, \
@@ -432,12 +465,34 @@ def train_model(args, config, finetune=False):
             print("y shape = {}".format(dataloader_to_y[dl].shape))
             print("pred shape = {}".format(dataloader_to_pred[dl].shape))
 
-            if "Fluorescence" in dl:
+            if "Fluorescence" in dl and "classification" in dl:
                 print()
                 for j, output in enumerate(all_dataloaders[i].output_names):
                     cur_y = dataloader_to_y[dl][:, j]
                     cur_pred = dataloader_to_pred[dl][:, j]
 
+                    # apply sigmoid and round
+                    cur_pred = torch.sigmoid(cur_pred)
+                    cur_pred = torch.round(cur_pred)
+
+                    # get overall metrics
+                    acc = accuracy_score(cur_y, cur_pred)
+                    f1 = f1_score(cur_y, cur_pred)
+                    precision = precision_score(cur_y, cur_pred)
+                    recall = recall_score(cur_y, cur_pred)
+
+                    print("{} Accuracy = {} ≈ {}".format(output, acc, np.around(acc, 4)))
+                    print("{} F1 = {} ≈ {}".format(output, f1, np.around(f1, 4)))
+                    print("{} Precision = {} ≈ {}".format(output, precision, np.around(precision, 4)))
+                    print("{} Recall = {} ≈ {}".format(output, recall, np.around(recall, 4)))
+                    print()
+            elif "Fluorescence" in dl:
+                print()
+                for j, output in enumerate(all_dataloaders[i].output_names):
+                    cur_y = dataloader_to_y[dl][:, j]
+                    cur_pred = dataloader_to_pred[dl][:, j]
+
+                    # get overall metrics
                     r2 = r2_score(cur_y, cur_pred)
                     pearsonr = stats.pearsonr(cur_y, cur_pred)[0]
                     srho = stats.spearmanr(cur_y, cur_pred).correlation
@@ -446,17 +501,82 @@ def train_model(args, config, finetune=False):
                     print("{} PearsonR = {} ≈ {}".format(output, pearsonr, np.around(pearsonr, 4)))
                     print("{} Spearman rho = {} ≈ {}".format(output, srho, np.around(srho, 4)))
                     print()
+
+                    # get highly expressed promoter metrics
+                    highly_expressed_promoters = cur_y > np.percentile(cur_y, percentile_threshold_for_highly_expressed_promoters)
+                    cur_y_highly_expressed_promoters = cur_y[highly_expressed_promoters]
+                    cur_pred_highly_expressed_promoters = cur_pred[highly_expressed_promoters]
+                    highly_expressed_promoters_r2 = r2_score(cur_y_highly_expressed_promoters, cur_pred_highly_expressed_promoters)
+                    highly_expressed_promoters_pearsonr = stats.pearsonr(cur_y_highly_expressed_promoters, cur_pred_highly_expressed_promoters)[0]
+                    highly_expressed_promoters_srho = stats.spearmanr(cur_y_highly_expressed_promoters, cur_pred_highly_expressed_promoters).correlation
+
+                    print("{} R2 (highly expressed promoters) = {} ≈ {}".format(output, highly_expressed_promoters_r2, np.around(highly_expressed_promoters_r2, 4)))
+                    print("{} PearsonR (highly expressed promoters) = {} ≈ {}".format(output, highly_expressed_promoters_pearsonr, np.around(highly_expressed_promoters_pearsonr, 4)))
+                    print("{} Spearman rho (highly expressed promoters) = {} ≈ {}".format(output, highly_expressed_promoters_srho, np.around(highly_expressed_promoters_srho, 4)))
+                    print()
+
+                    # get lowly expressed promoter metrics
+                    lowly_expressed_promoters = cur_y < np.percentile(cur_y, percentile_threshold_for_lowly_expressed_promoters)
+                    cur_y_lowly_expressed_promoters = cur_y[lowly_expressed_promoters]
+                    cur_pred_lowly_expressed_promoters = cur_pred[lowly_expressed_promoters]
+                    lowly_expressed_promoters_r2 = r2_score(cur_y_lowly_expressed_promoters, cur_pred_lowly_expressed_promoters)
+                    lowly_expressed_promoters_pearsonr = stats.pearsonr(cur_y_lowly_expressed_promoters, cur_pred_lowly_expressed_promoters)[0]
+                    lowly_expressed_promoters_srho = stats.spearmanr(cur_y_lowly_expressed_promoters, cur_pred_lowly_expressed_promoters).correlation
+
+                    print("{} R2 (lowly expressed promoters) = {} ≈ {}".format(output, lowly_expressed_promoters_r2, np.around(lowly_expressed_promoters_r2, 4)))
+                    print("{} PearsonR (lowly expressed promoters) = {} ≈ {}".format(output, lowly_expressed_promoters_pearsonr, np.around(lowly_expressed_promoters_pearsonr, 4)))
+                    print("{} Spearman rho (lowly expressed promoters) = {} ≈ {}".format(output, lowly_expressed_promoters_srho, np.around(lowly_expressed_promoters_srho, 4)))
+                    print()
+
+                    # get extreme expression promoter (= highly + lowly expressed) metrics
+                    extreme_expression_promoters = np.logical_or(highly_expressed_promoters, lowly_expressed_promoters)
+                    cur_y_extreme_expression_promoters = cur_y[extreme_expression_promoters]
+                    cur_pred_extreme_expression_promoters = cur_pred[extreme_expression_promoters]
+                    extreme_expression_promoters_r2 = r2_score(cur_y_extreme_expression_promoters, cur_pred_extreme_expression_promoters)
+                    extreme_expression_promoters_pearsonr = stats.pearsonr(cur_y_extreme_expression_promoters, cur_pred_extreme_expression_promoters)[0]
+                    extreme_expression_promoters_srho = stats.spearmanr(cur_y_extreme_expression_promoters, cur_pred_extreme_expression_promoters).correlation
+
+                    print("{} R2 (extreme expression promoters) = {} ≈ {}".format(output, extreme_expression_promoters_r2, np.around(extreme_expression_promoters_r2, 4)))
+                    print("{} PearsonR (extreme expression promoters) = {} ≈ {}".format(output, extreme_expression_promoters_pearsonr, np.around(extreme_expression_promoters_pearsonr, 4)))
+                    print("{} Spearman rho (extreme expression promoters) = {} ≈ {}".format(output, extreme_expression_promoters_srho, np.around(extreme_expression_promoters_srho, 4)))
+                    print()
                     
                     if output not in all_seeds_r2:
                         all_seeds_r2[output] = []
                         all_seeds_pearsonr[output] = []
                         all_seeds_srho[output] = []
+
+                        all_seeds_highly_expressed_promoters_r2[output] = []
+                        all_seeds_highly_expressed_promoters_pearsonr[output] = []
+                        all_seeds_highly_expressed_promoters_srho[output] = []
+
+                        all_seeds_lowly_expressed_promoters_r2[output] = []
+                        all_seeds_lowly_expressed_promoters_pearsonr[output] = []
+                        all_seeds_lowly_expressed_promoters_srho[output] = []
+
+                        all_seeds_extreme_expression_promoters_r2[output] = []
+                        all_seeds_extreme_expression_promoters_pearsonr[output] = []
+                        all_seeds_extreme_expression_promoters_srho[output] = []
+
                         all_seeds_y[output] = []
                         all_seeds_pred[output] = []
                         
                     all_seeds_r2[output].append(r2)
                     all_seeds_pearsonr[output].append(pearsonr)
                     all_seeds_srho[output].append(srho)
+
+                    all_seeds_highly_expressed_promoters_r2[output].append(highly_expressed_promoters_r2)
+                    all_seeds_highly_expressed_promoters_pearsonr[output].append(highly_expressed_promoters_pearsonr)
+                    all_seeds_highly_expressed_promoters_srho[output].append(highly_expressed_promoters_srho)
+
+                    all_seeds_lowly_expressed_promoters_r2[output].append(lowly_expressed_promoters_r2)
+                    all_seeds_lowly_expressed_promoters_pearsonr[output].append(lowly_expressed_promoters_pearsonr)
+                    all_seeds_lowly_expressed_promoters_srho[output].append(lowly_expressed_promoters_srho)
+
+                    all_seeds_extreme_expression_promoters_r2[output].append(extreme_expression_promoters_r2)
+                    all_seeds_extreme_expression_promoters_pearsonr[output].append(extreme_expression_promoters_pearsonr)
+                    all_seeds_extreme_expression_promoters_srho[output].append(extreme_expression_promoters_srho)
+
                     all_seeds_y[output].append(cur_y)
                     all_seeds_pred[output].append(cur_pred)
 
@@ -597,10 +717,37 @@ def train_model(args, config, finetune=False):
             r2 = np.average(all_seeds_r2[output])
             pearsonr = np.average(all_seeds_pearsonr[output])
             srho = np.average(all_seeds_srho[output])
+
+            highly_expressed_promoters_r2 = np.average(all_seeds_highly_expressed_promoters_r2[output])
+            highly_expressed_promoters_pearsonr = np.average(all_seeds_highly_expressed_promoters_pearsonr[output])
+            highly_expressed_promoters_srho = np.average(all_seeds_highly_expressed_promoters_srho[output])
+
+            lowly_expressed_promoters_r2 = np.average(all_seeds_lowly_expressed_promoters_r2[output])
+            lowly_expressed_promoters_pearsonr = np.average(all_seeds_lowly_expressed_promoters_pearsonr[output])
+            lowly_expressed_promoters_srho = np.average(all_seeds_lowly_expressed_promoters_srho[output])
+
+            extreme_expression_promoters_r2 = np.average(all_seeds_extreme_expression_promoters_r2[output])
+            extreme_expression_promoters_pearsonr = np.average(all_seeds_extreme_expression_promoters_pearsonr[output])
+            extreme_expression_promoters_srho = np.average(all_seeds_extreme_expression_promoters_srho[output])
             
             print("{} avg R2 = {} ≈ {}".format(output, r2, np.around(r2, 4)))
             print("{} avg PearsonR = {} ≈ {}".format(output, pearsonr, np.around(pearsonr, 4)))
             print("{} avg Spearman rho = {} ≈ {}".format(output, srho, np.around(srho, 4)))
+            print()
+
+            print("{} avg R2 (highly expressed promoters) = {} ≈ {}".format(output, highly_expressed_promoters_r2, np.around(highly_expressed_promoters_r2, 4)))
+            print("{} avg PearsonR (highly expressed promoters) = {} ≈ {}".format(output, highly_expressed_promoters_pearsonr, np.around(highly_expressed_promoters_pearsonr, 4)))
+            print("{} avg Spearman rho (highly expressed promoters) = {} ≈ {}".format(output, highly_expressed_promoters_srho, np.around(highly_expressed_promoters_srho, 4)))
+            print()
+
+            print("{} avg R2 (lowly expressed promoters) = {} ≈ {}".format(output, lowly_expressed_promoters_r2, np.around(lowly_expressed_promoters_r2, 4)))
+            print("{} avg PearsonR (lowly expressed promoters) = {} ≈ {}".format(output, lowly_expressed_promoters_pearsonr, np.around(lowly_expressed_promoters_pearsonr, 4)))
+            print("{} avg Spearman rho (lowly expressed promoters) = {} ≈ {}".format(output, lowly_expressed_promoters_srho, np.around(lowly_expressed_promoters_srho, 4)))
+            print()
+
+            print("{} avg R2 (extreme expression promoters) = {} ≈ {}".format(output, extreme_expression_promoters_r2, np.around(extreme_expression_promoters_r2, 4)))
+            print("{} avg PearsonR (extreme expression promoters) = {} ≈ {}".format(output, extreme_expression_promoters_pearsonr, np.around(extreme_expression_promoters_pearsonr, 4)))
+            print("{} avg Spearman rho (extreme expression promoters) = {} ≈ {}".format(output, extreme_expression_promoters_srho, np.around(extreme_expression_promoters_srho, 4)))
             print()
 
             summary[output + "_avg_R2"] = r2

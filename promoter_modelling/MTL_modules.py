@@ -6,9 +6,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import pytorch_lightning as pl
-from pytorch_lightning.trainer.supporters import CombinedLoader
+from pytorch_lightning.utilities.combined_loader import CombinedLoader
 
 import torchmtl
+
+from promoter_modelling.backbone_modules import *
 
 np.random.seed(97)
 torch.manual_seed(97)
@@ -17,12 +19,17 @@ torch.manual_seed(97)
 class MTLDataLoader(pl.LightningDataModule):
     # change min_size to max_size_cycle to iterate through largest dataset fully during each training epoch
     # more details: https://github.com/Lightning-AI/lightning/blob/15ef52bc732d1f907de4de58683f131652c0d68c/src/pytorch_lightning/trainer/supporters.py
-    def __init__(self, all_dataloaders, train_mode="min_size"):
+    def __init__(self, all_dataloaders, train_mode="min_size", return_full_dataset_for_predict=False):
         super().__init__()
         
         self.all_train_ds = CombinedLoader([i.train_dataloader() for i in all_dataloaders], train_mode)
         self.all_test_ds = [i.test_dataloader() for i in all_dataloaders]
         self.all_val_ds = [i.val_dataloader() for i in all_dataloaders]
+
+        if return_full_dataset_for_predict:
+            self.all_predict_ds = [i.full_dataloader() for i in all_dataloaders]
+        else:
+            self.all_predict_ds = [i.test_dataloader() for i in all_dataloaders]
         
     def train_dataloader(self):
         return self.all_train_ds
@@ -34,7 +41,28 @@ class MTLDataLoader(pl.LightningDataModule):
         return self.all_val_ds
 
     def predict_dataloader(self):
-        return self.all_test_ds
+        return self.all_predict_ds
+
+# final prediction module that uses two linear layers per output and then stacks them
+class MTLFinalPredictor(nn.Module):
+    def __init__(self, input_size, output_size, dropout=0.1):
+        super().__init__()
+        self.input_size = input_size
+        self.output_size = output_size
+        self.dropout = dropout
+        
+        self.all_layers = nn.ModuleList()
+        for i in range(self.output_size):
+            self.all_layers.append(nn.Sequential(nn.Linear(self.input_size, self.input_size), \
+                                                 nn.ReLU(), \
+                                                 nn.Dropout(self.dropout), \
+                                                 nn.Linear(self.input_size, 1)))
+    
+    def forward(self, x):
+        all_outputs = []
+        for i in range(self.output_size):
+            all_outputs.append(self.all_layers[i](x))
+        return torch.cat(all_outputs, dim=1)
 
 '''
 Main class used to train models
@@ -49,6 +77,7 @@ class MTLPredictor(pl.LightningModule):
                  model_class, \
                  all_dataloader_modules, \
                  batch_size, \
+                 max_epochs=None, \
                  n_cpus=8, \
                  lr=1e-5, \
                  weight_decay=1e-4, \
@@ -96,7 +125,7 @@ class MTLPredictor(pl.LightningModule):
             task = self.all_dataloaders[0]
             model_config.append({
                                     'name': task.name,
-                                    'layers': nn.Linear(self.backbone_model.embed_dims, task.num_outputs),
+                                    'layers': MTLFinalPredictor(self.backbone_model.embed_dims, task.num_outputs),
                                     'loss': task.loss_fn,
                                     'loss_weight': torch.tensor(0.0),
                                     'anchor_layer': 'Backbone'
@@ -118,6 +147,7 @@ class MTLPredictor(pl.LightningModule):
         # optimizer hyperparams
         self.lr = lr
         self.weight_decay = weight_decay
+        self.max_epochs = max_epochs
 
     def get_mtldataloader(self):
         return self.mtldataloader
@@ -241,7 +271,7 @@ class MTLPredictor(pl.LightningModule):
 
         self.log("{}_val_loss".format(self.all_dataloaders[dataloader_idx].name), loss)
     
-    def validation_epoch_end(self, val_step_outputs):
+    def on_validation_epoch_end(self):
         overall_loss = 0
         for i, dl in enumerate(self.all_dataloaders):
             dl_metrics = dl.compute_metrics("val")
@@ -397,6 +427,21 @@ class MTLPredictor(pl.LightningModule):
         return predict_y, predict_preds
     
     def configure_optimizers(self):
+        # if backbone_model is of type backbone_modules.LegNet, use AdamW + OneCycleLR
+        if isinstance(self.backbone_model, LegNet) or isinstance(self.backbone_model, LegNetLarge):
+            div_factor = 25
+            print("Using AdamW + OneCycleLR min_lr = {} max_lr = {} weight_decay = {}".format(self.lr / div_factor, self.lr, self.weight_decay))
+            optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr / div_factor, weight_decay=self.weight_decay)
+            scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, 
+                                                max_lr=self.lr,
+                                                div_factor=div_factor,
+                                                steps_per_epoch=len(self.all_dataloaders[-1].train_dataloader()), 
+                                                epochs=self.max_epochs, 
+                                                pct_start=0.3,
+                                                three_phase="store_true")
+            return [optimizer], [scheduler]
+
+
         print("Using AdamW lr = {} weight_decay = {}".format(self.lr, self.weight_decay))
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         return optimizer

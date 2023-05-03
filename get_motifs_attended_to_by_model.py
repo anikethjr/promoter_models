@@ -98,7 +98,7 @@ elif "single" in args.modelling_strategy:
     name_format = "individual_training_on_{}".format("+".join(tasks))
 
 # load motif insertion analysis results
-motif_insertion_analysis_results = pd.read_csv(os.path.join(motif_insertion_analysis_dir, "{}_v3_A40.tsv".format(name_format)), sep="\t")
+motif_insertion_analysis_results = pd.read_csv(os.path.join(motif_insertion_analysis_dir, "{}.tsv".format(name_format)), sep="\t")
 
 # load t-test results
 ttest_results = pd.read_csv(path_to_ttest_results_file)

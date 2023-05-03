@@ -95,7 +95,7 @@ class FluorescenceDataLoader(pl.LightningDataModule):
     def update_metrics(self, y_hat, y, loss, split):
         self.all_metrics[split]["{}_avg_epoch_loss".format(self.name)].update(loss)
         for i, output in enumerate(self.output_names):
-            for met in ["MSE", "MAE", "R2", "PearsonR", "SpearmanR"]:
+            for met in ["Accuracy", "Precision", "Recall", "F1"]:
                 self.all_metrics[split]["{}_{}_{}".format(self.name, output, met)].update(y_hat[:, i], y[:, i])
     
     def compute_metrics(self, split):
@@ -103,7 +103,7 @@ class FluorescenceDataLoader(pl.LightningDataModule):
 
         metrics_dict["{}_{}_avg_epoch_loss".format(split, self.name)] = self.all_metrics[split]["{}_avg_epoch_loss".format(self.name)].compute()
 
-        metrics_set = ["MSE", "MAE", "R2", "PearsonR", "SpearmanR"]
+        metrics_set = ["Accuracy", "Precision", "Recall", "F1"]
         
         for met in metrics_set:
             for i, output in enumerate(self.output_names):
@@ -128,7 +128,6 @@ class FluorescenceDataLoader(pl.LightningDataModule):
                  min_reads = 5, \
                  train_fraction = 0.7, \
                  val_fraction = 0.1, \
-                 zscore = False, \
                  use_cache = True, \
                  return_specified_cells = None, \
                  predict_DE = False):
@@ -145,12 +144,13 @@ class FluorescenceDataLoader(pl.LightningDataModule):
             cache_dir = os.path.join(cache_dir + "_seed_{}".format(seed))
             print("Using seed = {}".format(seed))
         
-        print("Creating Fluorescence DataLoader object")
+        print("Creating Fluorescence classification DataLoader object")
 
-        self.name = "Fluorescence"
+        self.name = "Fluorescence_classification"
 
-        self.task = "regression"
-        self.loss_fn = nn.MSELoss()
+        self.task = "classification"
+        self.use_1hot_for_classification = False
+        self.loss_fn = nn.BCEWithLogitsLoss()
         self.with_mask = False
 
         self.batch_size = batch_size
@@ -176,8 +176,7 @@ class FluorescenceDataLoader(pl.LightningDataModule):
         self.train_fraction = train_fraction
         self.val_fraction = val_fraction
         self.test_fraction = 1.0 - train_fraction - val_fraction
-        
-        self.zscore = zscore
+
         self.predict_DE = predict_DE
 
         if self.predict_DE:
@@ -193,14 +192,6 @@ class FluorescenceDataLoader(pl.LightningDataModule):
                 if col.endswith("_sum") and col != "cum_sum":
                     self.measurements["keep"] = self.measurements["keep"] & (self.measurements[col] >= min_reads)
             self.measurements = self.measurements[self.measurements["keep"]].drop("keep", axis=1).reset_index(drop=True)
-
-            # divide the read counts by the total number of reads across sequences
-            for col in self.measurements.columns:
-                if not (col.endswith("_sum") or col == "sequence"):
-                    print("Normalizing {}, sum before = {}".format(col, self.measurements[col].sum()))
-                    self.measurements[col] = self.measurements[col] + 1.0 # pseudocount
-                    self.measurements[col] = self.measurements[col] / self.measurements[col].sum() # normalize
-                    print("After normalizing {}, sum = {}".format(col, self.measurements[col].sum()))
             
             for cell in self.cell_names:
                 first_letter_of_cell_name = cell[:1]
@@ -211,20 +202,21 @@ class FluorescenceDataLoader(pl.LightningDataModule):
                         other_cells_first_letters = [c[:1] for c in other_cells]
                         avg_ratio = 0
                         for other_cell, other_cell_first_letter in zip(other_cells, other_cells_first_letters):
-                            avg_ratio += (self.measurements["{}{}_P4".format(other_cell_first_letter, rep+1)]) / (self.measurements["{}{}_P7".format(other_cell_first_letter, rep+1)])
+                            avg_ratio += (self.measurements["{}{}_P4".format(other_cell_first_letter, rep+1)] + 1) / (self.measurements["{}{}_P7".format(other_cell_first_letter, rep+1)] + 1)
                         avg_ratio /= len(other_cells)
 
-                        cur_ratio = (self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)]) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)])
+                        cur_ratio = (self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)] + 1) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)] + 1)
 
                         # DE = ratio of P4 to P7 in cell of interest / ratio of P4 to P7 in other cells
                         self.measurements[cell] += np.log2(cur_ratio / avg_ratio)
                     else:
-                        self.measurements[cell] += np.log2((self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)]) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)]))
+                        self.measurements[cell] += np.log2((self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)] + 1) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)] + 1))
                 self.measurements[cell] /= self.num_replicates
 
-            if self.zscore:
-                for cell in self.cell_names:
-                    self.measurements[cell] = stats.zscore(self.measurements[cell])
+            # binarize measurements by assigning 1 to all measurements above the median
+            for cell in self.cell_names:
+                self.measurements["numerical_" + cell] = self.measurements[cell]
+                self.measurements[cell] = self.measurements[cell] > np.median(self.measurements[cell])
 
             self.sequence_properties = pd.read_csv(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv"), sep="\t")
             self.sequence_properties["cell_specific_class"] = self.sequence_properties.apply(lambda x: determine_cell_specific_class(x), axis=1)
@@ -298,12 +290,11 @@ class FluorescenceDataLoader(pl.LightningDataModule):
 
         # specify metrics to track for this dataloader
         self.metrics = {}
-        for i, cell in enumerate(self.output_names):
-            self.metrics["{}_{}_MSE".format(self.name, cell)] = torchmetrics.MeanSquaredError()
-            self.metrics["{}_{}_MAE".format(self.name, cell)] = torchmetrics.MeanAbsoluteError()
-            self.metrics["{}_{}_R2".format(self.name, cell)] = torchmetrics.R2Score()
-            self.metrics["{}_{}_PearsonR".format(self.name, cell)] = torchmetrics.PearsonCorrCoef()
-            self.metrics["{}_{}_SpearmanR".format(self.name, cell)] = torchmetrics.SpearmanCorrCoef()     
+        for i, cell in enumerate(self.output_names):            
+            self.metrics["{}_{}_Accuracy".format(self.name, cell)] = torchmetrics.Accuracy(task='binary')
+            self.metrics["{}_{}_Precision".format(self.name, cell)] = torchmetrics.Precision(task='binary')
+            self.metrics["{}_{}_Recall".format(self.name, cell)] = torchmetrics.Recall(task='binary')
+            self.metrics["{}_{}_F1".format(self.name, cell)] = torchmetrics.F1Score(task='binary')
         self.metrics["{}_avg_epoch_loss".format(self.name)] = torchmetrics.MeanMetric()
         self.metrics = torchmetrics.MetricCollection(self.metrics)
 
@@ -320,9 +311,6 @@ class FluorescenceDataLoader(pl.LightningDataModule):
         print("Creating val dataset")
         self.val_dataset = FluorescenceDataset(self.val_set, "val", self.num_cells, self.cell_names, \
                                                cache_dir=self.cache_dir, use_cache=use_cache)
-        print("Creating full dataset")
-        self.full_dataset = FluorescenceDataset(self.merged, "full", self.num_cells, self.cell_names, \
-                                                cache_dir=self.cache_dir, use_cache=use_cache)
         
         print("Train set has {} promoter-expression pairs from {} total pairs ({:.2f}% of dataset)".format(len(self.train_dataset), \
                                                                                                            self.merged.shape[0], \
@@ -333,9 +321,17 @@ class FluorescenceDataLoader(pl.LightningDataModule):
         print("Val set has {} promoter-expression data from {} total pairs ({:.2f}% of dataset)".format(len(self.val_dataset), \
                                                                                                         self.merged.shape[0], \
                                                                                                         100.0*self.val_set.shape[0]/self.merged.shape[0]))
-        print("Full set has {} promoter-expression data from {} total pairs ({:.2f}% of dataset)".format(len(self.full_dataset), \
-                                                                                                            self.merged.shape[0], \
-                                                                                                            100.0*self.merged.shape[0]/self.merged.shape[0]))
+        
+        # print number of positive and negative examples in each dataset
+        for split in ["train", "test", "val"]:
+            split_set = getattr(self, split + "_set")
+            for cell in self.cell_names:
+                num_positive = (split_set[cell] == 1).sum()
+                num_negative = (split_set[cell] == 0).sum()
+                percent_positive = 100.0 * num_positive / (num_positive + num_negative)
+                percent_negative = 100.0 * num_negative / (num_positive + num_negative)
+                print("{} set has {} positive examples ({:.2f}%) and {} negative examples ({:.2f}%) for cell {}".format(split, num_positive, percent_positive, num_negative, percent_negative, cell))
+        
         print("Completed Instantiation of Fluorescence DataLoader")        
     
     def train_dataloader(self):
@@ -349,6 +345,3 @@ class FluorescenceDataLoader(pl.LightningDataModule):
     
     def predict_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.n_cpus, pin_memory=True)
-    
-    def full_dataloader(self):
-        return DataLoader(self.full_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.n_cpus, pin_memory=True)

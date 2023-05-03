@@ -100,7 +100,7 @@ class SharprMPRADataLoader(pl.LightningDataModule):
         
         print("Creating Sharpr MPRA DataLoader object")
         
-        self.name = "SharprMPRA"
+        self.name = "Sharpr_MPRA"
 
         self.task = "regression"
         self.loss_fn = nn.MSELoss()
