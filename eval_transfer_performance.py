@@ -26,6 +26,7 @@ from promoter_modelling import MTL_modules
 
 np.random.seed(97)
 torch.manual_seed(97)
+torch.set_float32_matmul_precision('medium')
 
 def get_predictions(args, config, finetune=False):
     # define directories
@@ -324,7 +325,7 @@ def get_predictions(args, config, finetune=False):
     final_evaluation_dataloader = MTL_modules.MTLDataLoader(evaluation_dataloaders, return_full_dataset_for_predict=True)
         
     # get predictions
-    trainer = pl.Trainer(gpus=1)
+    trainer = pl.Trainer(accelerator="gpu", devices=1)
     model_outputs = trainer.predict(mtlpredictor, final_evaluation_dataloader)
     
     dataloader_to_outputs = {}
@@ -436,7 +437,7 @@ if "RNASeq" in training_tasks:
 # compare predictions to actual values
 print("Comparing predictions to actual values")
 assert (args.output_inds_to_compare is not None), "Must specify output inds to compare"
-args.output_inds_to_compare = args.output_inds_to_compare.split(" ")
+args.output_inds_to_compare = args.output_inds_to_compare.strip().split(" ")
 
 assert (len(args.output_inds_to_compare) == len(all_heads_preds)), "Number of elements in output inds to compare list must be the same as the number of training tasks/heads"
 

@@ -368,7 +368,10 @@ class MTLPredictor(pl.LightningModule):
         if self.with_motifs:
             X, motifs, y = batch
         elif self.all_dataloader_modules[dataloader_idx].with_mask:
-            X, y, mask = batch
+            if len(batch) < 3: # happens when evaluating on a dataloader other than the training dataloader
+                X, y = batch
+            else:
+                X, y, mask = batch
         else:
             X, y = batch
         
