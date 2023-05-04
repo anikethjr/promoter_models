@@ -289,7 +289,7 @@ def get_predictions(args, config, finetune=False):
             new_state_dict[key[len("model."):]] = checkpoint["state_dict"][key]
 
     # instantiate model
-    mtlpredictor = MTL_modules.MTLPredictor(model_class=backbone_modules.MTLucifer, \
+    mtlpredictor = MTL_modules.MTLPredictor(model_class=backbone_modules.MTLuciferGN, \
                                             all_dataloader_modules=all_dataloaders, \
                                             batch_size=batch_size, \
                                             use_preconstructed_dataloaders=True).to(device)
