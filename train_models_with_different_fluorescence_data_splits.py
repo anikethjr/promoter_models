@@ -18,12 +18,13 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from promoter_modelling.dataloaders import FluorescenceData, FluorescenceData_classification, FluorescenceData_with_motifs, FluorescenceData_DNABERT, \
-                                           LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq
+                                           LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, STARRSeq
 from promoter_modelling import backbone_modules
 from promoter_modelling import MTL_modules
 
 np.random.seed(97)
 torch.manual_seed(97)
+torch.set_float32_matmul_precision('medium')
 
 def train_model(args, config, finetune=False):
     # create directories
@@ -103,6 +104,10 @@ def train_model(args, config, finetune=False):
                 elif t == "Sharpr_MPRA":
                     dataloaders[task].append(Sharpr_MPRA.SharprMPRADataLoader(batch_size=args.batch_size, \
                                                                                 data_dir=os.path.join(root_data_dir, "Sharpr_MPRA")))
+                elif t == "STARRSeq":
+                    dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=args.batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
+                                                                            common_cache_dir=common_cache_dir))
                 elif t == "SuRE_classification":
                     for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
                         dataloaders[task].append(SuRE.SuREDataLoader(batch_size=args.batch_size, \
@@ -166,6 +171,10 @@ def train_model(args, config, finetune=False):
             dataloaders[task] = Roadmap.RoadmapDataLoader(batch_size=args.batch_size, \
                                                             cache_dir=os.path.join(root_data_dir, "Roadmap"), \
                                                             common_cache_dir=common_cache_dir)
+        elif task == "STARRSeq":
+            dataloaders[task] = STARRSeq.STARRSeqDataLoader(batch_size=args.batch_size, \
+                                                                cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
+                                                                common_cache_dir=common_cache_dir)
         elif task == "Sharpr_MPRA":
             dataloaders[task] = Sharpr_MPRA.SharprMPRADataLoader(batch_size=args.batch_size, \
                                                                     data_dir=os.path.join(root_data_dir, "Sharpr_MPRA"))
@@ -248,6 +257,38 @@ def train_model(args, config, finetune=False):
         print("Loading pre-trained model state dict")
 
         pretrained_model_name = "pretrain_on_{}".format("+".join(pretrain_tasks))
+        # map to model classes
+        if args.model_name == "MTLucifer":
+            model_class = backbone_modules.MTLucifer
+        elif args.model_name == "MTLuciferGranular":
+            model_class = backbone_modules.MTLuciferGranular
+            pretrained_model_name = "MTLuciferGranular_" + pretrained_model_name
+        elif args.model_name == "PureCNN":
+            model_class = backbone_modules.PureCNN
+            pretrained_model_name = "PureCNN_" + pretrained_model_name
+        elif args.model_name == "PureCNNLarge":
+            model_class = backbone_modules.PureCNNLarge
+            pretrained_model_name = "PureCNNLarge_" + pretrained_model_name
+        elif args.model_name == "ResNet":
+            model_class = backbone_modules.ResNet
+            pretrained_model_name = "ResNet_" + pretrained_model_name
+        elif args.model_name == "MotifBasedFCN":
+            model_class = backbone_modules.MotifBasedFCN
+            pretrained_model_name = "MotifBasedFCN_" + pretrained_model_name
+        elif args.model_name == "MotifBasedFCNLarge":
+            model_class = backbone_modules.MotifBasedFCNLarge
+            pretrained_model_name = "MotifBasedFCNLarge_" + pretrained_model_name
+        elif args.model_name == "DNABERT":
+            model_class = backbone_modules.DNABERT
+            pretrained_model_name = "DNABERT_" + pretrained_model_name
+        elif args.model_name == "LegNet":
+            model_class = backbone_modules.LegNet
+            pretrained_model_name = "LegNet_" + pretrained_model_name
+        elif args.model_name == "LegNetLarge":
+            model_class = backbone_modules.LegNetLarge
+            pretrained_model_name = "LegNetLarge_" + pretrained_model_name
+        else:
+            raise Exception("Invalid model_name specified, must be 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
         pretrain_metric_direction_which_is_optimal = args.pretrain_metric_direction_which_is_optimal
         pretrained_model_save_dir = os.path.join(model_save_dir, pretrained_model_name, "default", "checkpoints")
 
@@ -324,6 +365,9 @@ def train_model(args, config, finetune=False):
     # map to model classes
     if args.model_name == "MTLucifer":
         model_class = backbone_modules.MTLucifer
+    elif args.model_name == "MTLuciferGranular":
+        model_class = backbone_modules.MTLuciferGranular
+        name_format = "MTLuciferGranular_" + name_format
     elif args.model_name == "PureCNN":
         model_class = backbone_modules.PureCNN
         name_format = "PureCNN_" + name_format
@@ -349,7 +393,7 @@ def train_model(args, config, finetune=False):
         model_class = backbone_modules.LegNetLarge
         name_format = "LegNetLarge_" + name_format
     else:
-        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
 
     # train models
     all_seeds_r2 = {}
@@ -499,7 +543,7 @@ def train_model(args, config, finetune=False):
             print("Loaded existing model")
             
             # get test set predictions
-            trainer = pl.Trainer(gpus=1)
+            trainer = pl.Trainer(accelerator="gpu", devices=1)
             best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader())
 
         else:
@@ -541,7 +585,7 @@ def train_model(args, config, finetune=False):
 
             trainer = pl.Trainer(logger=wandb_logger, \
                                 callbacks=[early_stop_callback, checkpoint_callback], \
-                                deterministic=True, gpus=1, \
+                                deterministic=True, accelerator="gpu", devices=1, \
                                 log_every_n_steps=10, default_root_dir=model_save_dir, \
                                 max_epochs=max_epochs, \
                                 limit_test_batches=0, reload_dataloaders_every_n_epochs=2, enable_progress_bar = True, \
@@ -809,7 +853,7 @@ def train_model(args, config, finetune=False):
 
 args = argparse.ArgumentParser()
 args.add_argument("--config_path", type=str, default="./config.json", help="Path to config file")
-args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
 args.add_argument("--modelling_strategy", type=str, required=True, help="Modelling strategy to use, either 'joint', 'pretrain+finetune', 'pretrain+linear_probing' or 'single_task'")
 
 args.add_argument("--joint_tasks", type=str, default=None, help="Comma separated list of tasks to jointly train on")

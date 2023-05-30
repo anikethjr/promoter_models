@@ -9,6 +9,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import einsum
 
+import einops
+from rotary_embedding_torch import RotaryEmbedding
+
 from transformers import AutoTokenizer, AutoModel
 
 from tltorch import TRL
@@ -17,18 +20,18 @@ np.random.seed(97)
 torch.manual_seed(97)
 
 class CNNBlockGN(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=1, dilation=1, bias=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=1, dilation=1, bias=False, gn_num_groups=16):
         super().__init__()
         self.cnn = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, \
                              stride=stride, padding=padding, dilation=dilation, bias=bias)
         # self.bn = nn.BatchNorm1d(out_channels)
-        self.gn = nn.GroupNorm(out_channels, out_channels)
+        self.gn = nn.GroupNorm(gn_num_groups, out_channels)
         self.dropout = nn.Dropout(0.1)
         
     def forward(self, inputs):
         seq = inputs
         # x = self.bn(F.relu(self.cnn(seq)))
-        x = self.gn(F.relu(self.cnn(seq)))
+        x = self.gn(F.gelu(self.cnn(seq)))
         x = self.dropout(x)
         
         return x
@@ -90,17 +93,84 @@ class ResidualBlock(nn.Module):
 
         return xlp1
 
+# class TransformerBlock(nn.Module):
+#     def __init__(self, d_model=256, nhead=8, batch_first=True):
+#         super().__init__()
+#         self.transformer_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, batch_first=batch_first)
+    
+#     def forward(self, inputs):
+#         seq = inputs
+#         seq = seq.permute(0, 2, 1)
+#         x = self.transformer_layer(seq)
+#         x = x.permute(0, 2, 1)
+        
+#         return x
+
 class TransformerBlock(nn.Module):
-    def __init__(self, d_model=256, nhead=8, batch_first=True):
+    def __init__(self, d_model, nhead, mlp_dim=4096, dropout=0.1, use_position_embedding=True):
+        assert d_model % nhead == 0
         super().__init__()
-        self.transformer_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, batch_first=batch_first)
+        embedding_dim = d_model
+        self.embedding_dim = embedding_dim
+        self.num_heads = nhead
+        self.mlp_dim = mlp_dim
+        self.dropout = dropout
+        self.use_position_embedding = use_position_embedding
+
+        self.layer_norm1 = nn.LayerNorm(self.embedding_dim)
+        self.xk = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        self.xq = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        self.xv = nn.Linear(embedding_dim, embedding_dim, bias=False)
+
+        if self.use_position_embedding:
+            self.rotary_emb = RotaryEmbedding(dim=embedding_dim // self.num_heads)
+
+        self.dropout1 = nn.Dropout(dropout)
+        self.fc1 = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        self.dropout2 = nn.Dropout(dropout)
+        self.layer_norm2 = nn.LayerNorm(self.embedding_dim)
+        self.fc2 = nn.Linear(embedding_dim, mlp_dim)
+        self.fc3 = nn.Linear(mlp_dim, embedding_dim)
+        self.dropout3 = nn.Dropout(dropout)
     
     def forward(self, inputs):
-        seq = inputs
-        seq = seq.permute(0, 2, 1)
-        x = self.transformer_layer(seq)
-        x = x.permute(0, 2, 1)
+        x = self.layer_norm1(inputs)
+        xk = self.xk(x)
+        xq = self.xq(x)
+        xv = self.xv(x)
+
+        xk = xk.reshape(xk.shape[0], xk.shape[1], self.num_heads, self.embedding_dim // self.num_heads)
+        xq = xq.reshape(xq.shape[0], xq.shape[1], self.num_heads, self.embedding_dim // self.num_heads)
+        xv = xv.reshape(xv.shape[0], xv.shape[1], self.num_heads, self.embedding_dim // self.num_heads)
+
+        if self.use_position_embedding:
+            # make xq and xk have shape (batch_size, num_heads, seq_len, embedding_dim // num_heads)
+            xq = xq.permute(0, 2, 1, 3)
+            xk = xk.permute(0, 2, 1, 3)
+            xq = self.rotary_emb.rotate_queries_or_keys(xq, seq_dim=2)
+            xk = self.rotary_emb.rotate_queries_or_keys(xk, seq_dim=2)
+            # make xq and xk have shape (batch_size, seq_len, num_heads, embedding_dim // num_heads)
+            xq = xq.permute(0, 2, 1, 3)
+            xk = xk.permute(0, 2, 1, 3)
         
+        attention_weights = einops.einsum(xq, xk, '... q h d, ... k h d -> ... h q k')
+
+        attention_weights = attention_weights / np.sqrt(self.embedding_dim // self.num_heads)
+        attention_weights = F.softmax(attention_weights, dim=-1)
+        attention_weights = self.dropout1(attention_weights)
+        attention_output = einops.einsum(attention_weights, xv, '... h q k, ... k h d -> ... q h d')
+        attention_output = einops.rearrange(attention_output, '... h d -> ... (h d)')
+        attention_output = self.fc1(attention_output)
+        attention_output = self.dropout2(attention_output)
+
+        mlp_inputs = attention_output + inputs
+        x = self.layer_norm2(mlp_inputs)
+        x = self.fc2(x)
+        x = F.gelu(x)
+        x = self.fc3(x)
+        x = self.dropout3(x)
+        x = x + mlp_inputs
+
         return x
 
 class MTLucifer(nn.Module):
@@ -158,6 +228,65 @@ class MTLuciferGN(nn.Module):
         seq = seq.permute(0, 2, 1)
         seq = torch.hstack([self.cls_token_embedding.unsqueeze(0).unsqueeze(0).expand(seq.shape[0], -1, -1), seq]).permute(0, 2, 1)
         outs = self.promoter_transformer(seq)[:, :, 0]
+
+        return outs
+
+class MTLuciferEnhanced(nn.Module):
+    def __init__(self, nucleotide_embed_dims=1024, nheads=8):
+        super().__init__()
+        self.nheads = nheads
+        self.cls_token_embedding = nn.Parameter(torch.randn(nucleotide_embed_dims))
+        self.embed_dims = nucleotide_embed_dims
+        
+        self.promoter_cnn = nn.Sequential(
+                                            CNNBlockGN(in_channels = 4, out_channels = 256, kernel_size = 5, stride = 1, padding = 1, bias=True),
+                                            CNNBlockGN(in_channels = 256, out_channels = 512, kernel_size = 5, stride = 1, padding = 1, bias=True),
+                                            CNNBlockGN(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5, stride = 1, padding = 1, bias=True)
+                                         )
+        self.promoter_transformer = nn.Sequential(
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads)
+                                        )
+        
+    def forward(self, seq):
+        seq = seq.permute(0, 2, 1)
+        seq = self.promoter_cnn(seq)
+        seq = seq.permute(0, 2, 1)
+        seq = torch.hstack([self.cls_token_embedding.unsqueeze(0).unsqueeze(0).expand(seq.shape[0], -1, -1), seq])
+        outs = self.promoter_transformer(seq)[:, 0]
+
+        return outs
+    
+class MTLuciferGranular(nn.Module):
+    def __init__(self, nucleotide_embed_dims=768, nheads=8):
+        super().__init__()
+        self.nheads = nheads
+        self.cls_token_embedding = nn.Parameter(torch.randn(nucleotide_embed_dims))
+        self.embed_dims = nucleotide_embed_dims
+        
+        self.promoter_cnn = nn.Sequential(
+                                            CNNBlockGN(in_channels = 4, out_channels = 256, kernel_size = 5, stride = 1, padding = "same", bias=True),
+                                            CNNBlockGN(in_channels = 256, out_channels = 512, kernel_size = 5, stride = 1, padding = "same", bias=True),
+                                            nn.MaxPool1d(5),
+                                            CNNBlockGN(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5, stride = 1, padding = "same", bias=True)
+                                         )
+        self.promoter_transformer = nn.Sequential(
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads)
+                                        )
+        
+    def forward(self, seq):
+        seq = seq.permute(0, 2, 1)
+        seq = self.promoter_cnn(seq)
+        seq = seq.permute(0, 2, 1)
+        seq = torch.hstack([self.cls_token_embedding.unsqueeze(0).unsqueeze(0).expand(seq.shape[0], -1, -1), seq])
+        outs = self.promoter_transformer(seq)[:, 0]
 
         return outs
     

@@ -20,7 +20,7 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, lentiMPRA
+from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, lentiMPRA, STARRSeq
 from promoter_modelling import backbone_modules
 from promoter_modelling import MTL_modules
 
@@ -125,6 +125,10 @@ def get_predictions(args, config, finetune=False):
                     dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=args.batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
                                                                             common_cache_dir=common_cache_dir))
+                elif t == "STARRSeq":
+                    dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=args.batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
+                                                                            common_cache_dir=common_cache_dir))
                 elif t == "FluorescenceData":
                     dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData")))
@@ -180,6 +184,10 @@ def get_predictions(args, config, finetune=False):
         elif task == "lentiMPRA":
             dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=args.batch_size, \
                                                                 cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
+                                                                common_cache_dir=common_cache_dir)
+        elif task == "STARRSeq":
+            dataloaders[task] = STARRSeq.STARRSeqDataLoader(batch_size=args.batch_size, \
+                                                                cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
                                                                 common_cache_dir=common_cache_dir)
         elif task == "FluorescenceData":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
@@ -238,6 +246,39 @@ def get_predictions(args, config, finetune=False):
     elif "single" in args.modelling_strategy:
         name_format = "individual_training_on_{}".format("+".join(tasks))
 
+    # map to model classes
+    if args.model_name == "MTLucifer":
+        model_class = backbone_modules.MTLuciferEnhanced
+    elif args.model_name == "MTLuciferGranular":
+        model_class = backbone_modules.MTLuciferGranular
+        name_format = "MTLuciferGranular_" + name_format
+    elif args.model_name == "PureCNN":
+        model_class = backbone_modules.PureCNN
+        name_format = "PureCNN_" + name_format
+    elif args.model_name == "PureCNNLarge":
+        model_class = backbone_modules.PureCNNLarge
+        name_format = "PureCNNLarge_" + name_format
+    elif args.model_name == "ResNet":
+        model_class = backbone_modules.ResNet
+        name_format = "ResNet_" + name_format
+    elif args.model_name == "MotifBasedFCN":
+        model_class = backbone_modules.MotifBasedFCN
+        name_format = "MotifBasedFCN_" + name_format
+    elif args.model_name == "MotifBasedFCNLarge":
+        model_class = backbone_modules.MotifBasedFCNLarge
+        name_format = "MotifBasedFCNLarge_" + name_format
+    elif args.model_name == "DNABERT":
+        model_class = backbone_modules.DNABERT
+        name_format = "DNABERT_" + name_format
+    elif args.model_name == "LegNet":
+        model_class = backbone_modules.LegNet
+        name_format = "LegNet_" + name_format
+    elif args.model_name == "LegNetLarge":
+        model_class = backbone_modules.LegNetLarge
+        name_format = "LegNetLarge_" + name_format
+    else:
+        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+
     # get best trained model path
     best_model_path = ""
     minimize_metric = metric_direction_which_is_optimal == "min"
@@ -289,7 +330,7 @@ def get_predictions(args, config, finetune=False):
             new_state_dict[key[len("model."):]] = checkpoint["state_dict"][key]
 
     # instantiate model
-    mtlpredictor = MTL_modules.MTLPredictor(model_class=backbone_modules.MTLuciferGN, \
+    mtlpredictor = MTL_modules.MTLPredictor(model_class=model_class, \
                                             all_dataloader_modules=all_dataloaders, \
                                             batch_size=batch_size, \
                                             use_preconstructed_dataloaders=True).to(device)
@@ -359,6 +400,7 @@ def get_predictions(args, config, finetune=False):
 
 args = argparse.ArgumentParser()
 args.add_argument("--config_path", type=str, default="./config.json", help="Path to config file")
+args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
 args.add_argument("--modelling_strategy", type=str, required=True, help="Modelling strategy to use, either 'joint', 'pretrain+finetune', 'pretrain+linear_probing' or 'single_task'")
 
 args.add_argument("--joint_tasks", type=str, default=None, help="Comma separated list of tasks to jointly train on")
