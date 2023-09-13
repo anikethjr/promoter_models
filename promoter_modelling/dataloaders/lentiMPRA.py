@@ -148,7 +148,7 @@ class lentiMPRADataLoader(pl.LightningDataModule):
                  cache_dir, \
                  common_cache_dir, \
                  n_cpus = 8, \
-                 train_chromosomes = ['1', '3', '5', '6', '7', '8', '11', '12', '14', '15', '16', '18', '19', '22', 'X', 'Y'], \
+                 train_chromosomes = ['1', '3', '5', '6', '7', '8', '11', '12', '14', '15', '16', '18', '19', '22', 'X', 'Y', 'specialchr'], \
                  test_chromosomes = ['2', '9', '10', '13', '20', '21'], \
                  val_chromosomes = ['4', '17'], \
                  use_cache = True):
@@ -193,10 +193,10 @@ class lentiMPRADataLoader(pl.LightningDataModule):
             self.designed_sequences_exps_path = os.path.join(self.cache_dir, "designed_sequences_exps.ods")
 
             # load data published by the authors
-            large_scale_positions = pd.read_excel(self.large_scale_positions_path)
-            large_scale_exps = pd.read_excel(self.large_scale_exps_path)
-            designed_sequences = pd.read_excel(self.designed_sequences_path)
-            designed_sequences_exps = pd.read_excel(self.designed_sequences_exps_path)
+            large_scale_positions = pd.read_excel(self.large_scale_positions_path, sheet_name=None)
+            large_scale_exps = pd.read_excel(self.large_scale_exps_path, sheet_name=None)
+            designed_sequences = pd.read_excel(self.designed_sequences_path, sheet_name=None)
+            designed_sequences_exps = pd.read_excel(self.designed_sequences_exps_path, sheet_name=None)
             
             final_dataset = {}
             final_dataset["sequence"] = []
@@ -261,10 +261,9 @@ class lentiMPRADataLoader(pl.LightningDataModule):
                 print("Number of measurements in {} = {}".format(cell, np.sum(~np.isnan(final_dataset[cell]))))
 
             # create train, test and val datasets
-            final_dataset = pd.read_csv(os.path.join(self.cache_dir, "final_dataset.tsv"), sep="\t")
-            final_dataset["is_train"] = final_dataset.apply(lambda x: x["chromosome"] in self.train_chromosomes, axis=1)
-            final_dataset["is_test"] = final_dataset.apply(lambda x: x["chromosome"] in self.test_chromosomes, axis=1)
-            final_dataset["is_val"] = final_dataset.apply(lambda x: x["chromosome"] in self.val_chromosomes, axis=1)
+            final_dataset["is_train"] = final_dataset.apply(lambda x: (x["chromosome"][3:] in self.train_chromosomes) or (x["chromosome"] in self.train_chromosomes), axis=1)
+            final_dataset["is_test"] = final_dataset.apply(lambda x: (x["chromosome"][3:] in self.test_chromosomes) or (x["chromosome"] in self.test_chromosomes), axis=1)
+            final_dataset["is_val"] = final_dataset.apply(lambda x: (x["chromosome"][3:] in self.val_chromosomes) or (x["chromosome"] in self.val_chromosomes), axis=1)
 
             # split undefined chromosome samples into train, test and val
             undefined_chromosome_indices = final_dataset[final_dataset["chromosome"] == "undefined"].index
