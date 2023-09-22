@@ -28,23 +28,24 @@ We also provide the best model checkpoints for the pretrained and jointly traine
 
 ## Commands to be run to reproduce results
 
-### Install the dependencies:
+### Install the package and dependencies:
 
-Run the following commands to create a mamba/conda environment and install the dependencies:
+Run the following commands to create a mamba/conda environment and install PyTorch. Further dependencies will be installed automatically when the package is installed.
 ```
 mamba create -n promoter_modelling pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 mamba activate promoter_modelling
 ```
 
-### Install the package:
+Also run the following commands for reproducible results:
+```
+conda env config vars set CUBLAS_WORKSPACE_CONFIG=:4096:8
+mamba deactivate
+mamba activate promoter_modelling
+```
 
-Run the following commands to install the package:
+Run the following command to install the package:
 ```
 python -m pip install -e .
-```
-Also run the following command for reproducible results:
-```
-export CUBLAS_WORKSPACE_CONFIG=:4096:8
 ```
 
 ### Commands to reproduce architecture validation results:

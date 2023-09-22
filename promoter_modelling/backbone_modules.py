@@ -253,6 +253,7 @@ class DNABERT(nn.Module):
 
 # architecture from Agarwal et al. (2023)
 # https://doi.org/10.1101%2F2023.03.05.531189
+# can only be used with a single task as the linear layers take flattened activations from the CNN that are length dependent
 class MPRAnn(nn.Module):
     def __init__(self):
         super().__init__()
@@ -266,7 +267,7 @@ class MPRAnn(nn.Module):
         self.bn3 = nn.BatchNorm1d(250)
         self.conv4 = nn.Conv1d(in_channels=250, out_channels=100, kernel_size=2, padding="valid")
         self.bn4 = nn.BatchNorm1d(100)
-        self.pool2 = nn.MaxPool1d(kernel_size=1, stride=1, padding="valid")
+        self.pool2 = nn.MaxPool1d(kernel_size=1, stride=1, padding="valid") # does nothing, idk why they even have this layer, but keeping it for consistency
         self.dropout2 = nn.Dropout(0.1)
         self.fc1 = nn.LazyLinear(300)
         self.dropout3 = nn.Dropout(0.3)

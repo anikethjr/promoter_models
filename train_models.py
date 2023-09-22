@@ -233,24 +233,21 @@ def train_model(args, config, finetune=False):
         # map to model classes
         if args.model_name == "MTLucifer":
             model_class = backbone_modules.MTLucifer
-        elif args.model_name == "MTLuciferGranular":
-            model_class = backbone_modules.MTLuciferGranular
-            pretrained_model_name = "MTLuciferGranular_" + pretrained_model_name
         elif args.model_name == "PureCNN":
             model_class = backbone_modules.PureCNN
             pretrained_model_name = "PureCNN_" + pretrained_model_name
         elif args.model_name == "PureCNNLarge":
             model_class = backbone_modules.PureCNNLarge
             pretrained_model_name = "PureCNNLarge_" + pretrained_model_name
-        elif args.model_name == "ResNet":
-            model_class = backbone_modules.ResNet
-            pretrained_model_name = "ResNet_" + pretrained_model_name
         elif args.model_name == "MotifBasedFCN":
             model_class = backbone_modules.MotifBasedFCN
             pretrained_model_name = "MotifBasedFCN_" + pretrained_model_name
         elif args.model_name == "MotifBasedFCNLarge":
             model_class = backbone_modules.MotifBasedFCNLarge
             pretrained_model_name = "MotifBasedFCNLarge_" + pretrained_model_name
+        elif args.model_name == "MPRAnn":
+            model_class = backbone_modules.MPRAnn
+            pretrained_model_name = "MPRAnn_" + pretrained_model_name
         elif args.model_name == "DNABERT":
             model_class = backbone_modules.DNABERT
             pretrained_model_name = "DNABERT_" + pretrained_model_name
@@ -261,7 +258,7 @@ def train_model(args, config, finetune=False):
             model_class = backbone_modules.LegNetLarge
             pretrained_model_name = "LegNetLarge_" + pretrained_model_name
         else:
-            raise Exception("Invalid model_name specified, must be 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+            raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet' or 'LegNetLarge'")
         pretrain_metric_direction_which_is_optimal = args.pretrain_metric_direction_which_is_optimal
         pretrained_model_save_dir = os.path.join(model_save_dir, pretrained_model_name, "default", "checkpoints")
 
@@ -338,24 +335,21 @@ def train_model(args, config, finetune=False):
     # map to model classes
     if args.model_name == "MTLucifer":
         model_class = backbone_modules.MTLucifer
-    elif args.model_name == "MTLuciferGranular":
-        model_class = backbone_modules.MTLuciferGranular
-        name_format = "MTLuciferGranular_" + name_format
     elif args.model_name == "PureCNN":
         model_class = backbone_modules.PureCNN
         name_format = "PureCNN_" + name_format
     elif args.model_name == "PureCNNLarge":
         model_class = backbone_modules.PureCNNLarge
         name_format = "PureCNNLarge_" + name_format
-    elif args.model_name == "ResNet":
-        model_class = backbone_modules.ResNet
-        name_format = "ResNet_" + name_format
     elif args.model_name == "MotifBasedFCN":
         model_class = backbone_modules.MotifBasedFCN
         name_format = "MotifBasedFCN_" + name_format
     elif args.model_name == "MotifBasedFCNLarge":
         model_class = backbone_modules.MotifBasedFCNLarge
         name_format = "MotifBasedFCNLarge_" + name_format
+    elif args.model_name == "MPRAnn":
+        model_class = backbone_modules.MPRAnn
+        name_format = "MPRAnn_" + name_format
     elif args.model_name == "DNABERT":
         model_class = backbone_modules.DNABERT
         name_format = "DNABERT_" + name_format
@@ -366,7 +360,7 @@ def train_model(args, config, finetune=False):
         model_class = backbone_modules.LegNetLarge
         name_format = "LegNetLarge_" + name_format
     else:
-        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet' or 'LegNetLarge'")
 
     # train models
     all_seeds_r2 = {}
@@ -835,7 +829,7 @@ def train_model(args, config, finetune=False):
 
 args = argparse.ArgumentParser()
 args.add_argument("--config_path", type=str, default="./config.json", help="Path to config file")
-args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet' or 'LegNetLarge'")
 args.add_argument("--modelling_strategy", type=str, required=True, help="Modelling strategy to use, either 'joint', 'pretrain+finetune', 'pretrain+linear_probing' or 'single_task'")
 
 args.add_argument("--joint_tasks", type=str, default=None, help="Comma separated list of tasks to jointly train on")
