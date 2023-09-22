@@ -130,7 +130,7 @@ class MTLucifer(nn.Module):
         seq = self.promoter_cnn(seq)
         seq = seq.permute(0, 2, 1)
         seq = torch.hstack([self.cls_token_embedding.expand(seq.shape[0], -1, -1), seq])
-        outs = self.promoter_transformer(seq)[:, :, 0]
+        outs = self.promoter_transformer(seq)[:, 0]
 
         return outs
   
