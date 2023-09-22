@@ -28,6 +28,14 @@ We also provide the best model checkpoints for the pretrained and jointly traine
 
 ## Commands to be run to reproduce results
 
+### Install the dependencies:
+
+Run the following commands to create a mamba/conda environment and install the dependencies:
+```
+mamba create -n promoter_modelling pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+mamba activate promoter_modelling
+```
+
 ### Install the package:
 
 Run the following commands to install the package:

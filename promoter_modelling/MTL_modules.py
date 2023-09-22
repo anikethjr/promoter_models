@@ -51,6 +51,7 @@ class MTLFinalPredictor(nn.Module):
         self.output_size = output_size
         self.dropout = dropout
         
+        self.ln = nn.LayerNorm(self.input_size)
         self.all_layers = nn.ModuleList()
         for i in range(self.output_size):
             self.all_layers.append(nn.Sequential(nn.Linear(self.input_size, self.input_size), \
@@ -60,6 +61,7 @@ class MTLFinalPredictor(nn.Module):
     
     def forward(self, x):
         all_outputs = []
+        x = self.ln(x)
         for i in range(self.output_size):
             all_outputs.append(self.all_layers[i](x))
         return torch.cat(all_outputs, dim=1)

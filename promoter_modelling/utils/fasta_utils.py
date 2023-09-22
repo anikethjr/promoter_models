@@ -5,7 +5,6 @@ import os
 import kipoiseq
 from kipoiseq import Interval
 import pyfaidx
-from pyfaidx import Fasta
 
 np.random.seed(97)
 
