@@ -565,7 +565,7 @@ def train_model(args, config, finetune=False):
                         assert param.requires_grad == False
 
             wandb_logger = WandbLogger(name=name, \
-                                    project='promoter_modelling', log_model=False)
+                                    project='promoter_modelling_pytorch', log_model=False)
 
             checkpoint_filename = "best-{epoch:02d}-{" + "{}".format(metric_to_monitor) + ":.5f}"
             checkpoint_callback = ModelCheckpoint(monitor=metric_to_monitor, \
