@@ -273,7 +273,7 @@ class MPRAnn(nn.Module):
         self.dropout3 = nn.Dropout(0.3)
         self.fc2 = nn.Linear(300, 200)
 
-        self.embed_dims = None
+        self.embed_dims = 200
 
     def forward(self, seq):
         seq = seq.permute(0, 2, 1)
@@ -299,9 +299,6 @@ class MPRAnn(nn.Module):
         seq = self.dropout3(seq)
         seq = self.fc2(seq)
         seq = F.sigmoid(seq)
-
-        if self.embed_dims is None:
-            self.embed_dims = seq.shape[1]
 
         return seq
 
