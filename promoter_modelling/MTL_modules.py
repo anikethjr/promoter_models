@@ -445,7 +445,10 @@ class MTLPredictor(pl.LightningModule):
                                                 pct_start=0.3,
                                                 three_phase="store_true")
             return [optimizer], [scheduler]
-
+        elif isinstance(self.backbone_model, MPRAnn):
+            print("Using Adam lr = {}".format(self.lr))
+            optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+            return optimizer
 
         print("Using AdamW lr = {} weight_decay = {}".format(self.lr, self.weight_decay))
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
