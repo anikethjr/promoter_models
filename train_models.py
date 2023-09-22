@@ -32,21 +32,21 @@ def train_model(args, config, finetune=False):
     # for modelling
     root_dir = config["root_dir"]
     if not os.path.exists(root_dir):
-        os.mkdir(root_dir)
+        os.makedirs(root_dir, exist_ok=True)
     model_save_dir = os.path.join(root_dir, "saved_models")
     if not os.path.exists(model_save_dir):
-        os.mkdir(model_save_dir)
+        os.makedirs(model_save_dir, exist_ok=True)
     summaries_save_dir = os.path.join(root_dir, "summaries")
     if not os.path.exists(summaries_save_dir):
-        os.mkdir(summaries_save_dir)
+        os.makedirs(summaries_save_dir, exist_ok=True)
 
     # for data
     root_data_dir = config["root_data_dir"]
     if not os.path.exists(root_data_dir):
-        os.mkdir(root_data_dir)
+        os.makedirs(root_data_dir, exist_ok=True)
     common_cache_dir = os.path.join(root_data_dir, "common")
     if not os.path.exists(common_cache_dir):
-        os.mkdir(common_cache_dir)
+        os.makedirs(common_cache_dir, exist_ok=True)
 
     # create data loaders
     if args.modelling_strategy == "joint":
@@ -877,13 +877,13 @@ with open(args.config_path, "r") as f:
 # setup wandb
 root_dir = config["root_dir"]
 if not os.path.exists(root_dir):
-    os.mkdir(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
 wandb_logs_save_dir = os.path.join(root_dir, "wandb_logs")
 if not os.path.exists(wandb_logs_save_dir):
-    os.mkdir(wandb_logs_save_dir)
+    os.makedirs(wandb_logs_save_dir, exist_ok=True)
 wandb_cache_dir = os.path.join(root_dir, "wandb_cache")
 if not os.path.exists(wandb_cache_dir):
-    os.mkdir(wandb_cache_dir)
+    os.makedirs(wandb_cache_dir, exist_ok=True)
 os.environ["WANDB_DIR"] = wandb_logs_save_dir
 os.environ["WANDB_CACHE_DIR"] = wandb_cache_dir
 
