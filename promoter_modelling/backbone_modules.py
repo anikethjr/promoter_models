@@ -261,13 +261,13 @@ class MPRAnn(nn.Module):
         self.bn1 = nn.BatchNorm1d(250)
         self.conv2 = nn.Conv1d(in_channels=250, out_channels=250, kernel_size=8, padding="valid")
         self.bn2 = nn.BatchNorm1d(250)
-        self.pool1 = nn.MaxPool1d(kernel_size=2, stride=2, padding="valid")
+        self.pool1 = nn.MaxPool1d(kernel_size=2, stride=2)
         self.dropout1 = nn.Dropout(0.1)
         self.conv3 = nn.Conv1d(in_channels=250, out_channels=250, kernel_size=3, padding="valid")
         self.bn3 = nn.BatchNorm1d(250)
         self.conv4 = nn.Conv1d(in_channels=250, out_channels=100, kernel_size=2, padding="valid")
         self.bn4 = nn.BatchNorm1d(100)
-        self.pool2 = nn.MaxPool1d(kernel_size=1, stride=1, padding="valid") # does nothing, idk why they even have this layer, but keeping it for consistency
+        self.pool2 = nn.MaxPool1d(kernel_size=1, stride=1) # does nothing, idk why they even have this layer, but keeping it for consistency
         self.dropout2 = nn.Dropout(0.1)
         self.fc1 = nn.LazyLinear(300)
         self.dropout3 = nn.Dropout(0.3)
