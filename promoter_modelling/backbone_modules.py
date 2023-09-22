@@ -113,9 +113,9 @@ class MTLucifer(nn.Module):
         self.mlp_dim = nucleotide_embed_dims * mlp_dim_ratio
         
         self.promoter_cnn = nn.Sequential(
-                                            CNNBlock(in_channels = 4, out_channels = 256, kernel_size = 5, stride = 1, padding = 1, bias=True),
-                                            CNNBlock(in_channels = 256, out_channels = 512, kernel_size = 5, stride = 1, padding = 1, bias=True),
-                                            CNNBlock(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5, stride = 1, padding = 1, bias=True)
+                                            CNNBlock(in_channels = 4, out_channels = 256, kernel_size = 5, stride = 1, bias=True),
+                                            CNNBlock(in_channels = 256, out_channels = 512, kernel_size = 5, stride = 1, bias=True),
+                                            CNNBlock(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5, stride = 1, bias=True)
                                          )
         self.promoter_transformer = nn.Sequential(
                                             TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
@@ -129,7 +129,7 @@ class MTLucifer(nn.Module):
         seq = seq.permute(0, 2, 1)
         seq = self.promoter_cnn(seq)
         seq = seq.permute(0, 2, 1)
-        seq = torch.hstack([self.cls_token_embedding.expand(seq.shape[0], -1, -1), seq]).permute(0, 2, 1)
+        seq = torch.hstack([self.cls_token_embedding.expand(seq.shape[0], -1, -1), seq])
         outs = self.promoter_transformer(seq)[:, :, 0]
 
         return outs
