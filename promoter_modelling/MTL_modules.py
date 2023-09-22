@@ -43,21 +43,22 @@ class MTLDataLoader(pl.LightningDataModule):
     def predict_dataloader(self):
         return self.all_predict_ds
 
-# final prediction module that uses two linear layers per output and then stacks them
+# final prediction module that uses 3 linear layers per output and then stacks them
 class MTLFinalPredictor(nn.Module):
-    def __init__(self, input_size, output_size, dropout=0.1):
+    def __init__(self, input_size, output_size, hidden_size=512):
         super().__init__()
         self.input_size = input_size
         self.output_size = output_size
-        self.dropout = dropout
+        self.hidden_size = hidden_size
         
         self.ln = nn.LayerNorm(self.input_size)
         self.all_layers = nn.ModuleList()
         for i in range(self.output_size):
-            self.all_layers.append(nn.Sequential(nn.Linear(self.input_size, self.input_size), \
-                                                 nn.ReLU(), \
-                                                 nn.Dropout(self.dropout), \
-                                                 nn.Linear(self.input_size, 1)))
+            self.all_layers.append(nn.Sequential(nn.Linear(self.input_size, self.hidden_size), \
+                                                 nn.GELU(), \
+                                                 nn.Linear(self.hidden_size, self.hidden_size), \
+                                                 nn.GELU(), \
+                                                 nn.Linear(self.hidden_size, 1)))
     
     def forward(self, x):
         all_outputs = []
@@ -125,13 +126,22 @@ class MTLPredictor(pl.LightningModule):
         if self.num_tasks == 1: # we don't want the loss scaling when there's only one loss term
             print("Single dataloader model")
             task = self.all_dataloaders[0]
-            model_config.append({
-                                    'name': task.name,
-                                    'layers': MTLFinalPredictor(self.backbone_model.embed_dims, task.num_outputs),
-                                    'loss': task.loss_fn,
-                                    'loss_weight': torch.tensor(0.0),
-                                    'anchor_layer': 'Backbone'
-                                })
+            if model_class == MPRAnn: # MPRAnn has a single linear layer at the end
+                model_config.append({
+                                        'name': task.name,
+                                        'layers': nn.Linear(self.backbone_model.embed_dims, task.num_outputs),
+                                        'loss': task.loss_fn,
+                                        'loss_weight': torch.tensor(1.0),
+                                        'anchor_layer': 'Backbone'
+                                    })
+            else:
+                model_config.append({
+                                        'name': task.name,
+                                        'layers': MTLFinalPredictor(self.backbone_model.embed_dims, task.num_outputs),
+                                        'loss': task.loss_fn,
+                                        'loss_weight': torch.tensor(0.0),
+                                        'anchor_layer': 'Backbone'
+                                    })
         else:
             for i, task in enumerate(self.all_dataloaders):
                 model_config.append({
