@@ -48,7 +48,7 @@ def train_model(args, config, finetune=False):
     if not os.path.exists(common_cache_dir):
         os.makedirs(common_cache_dir, exist_ok=True)
 
-    # create data loaders
+    # setup task(s)
     if args.modelling_strategy == "joint":
         assert args.joint_tasks is not None, "Must specify tasks to jointly train on"
         tasks = args.joint_tasks.split(",")
@@ -67,163 +67,6 @@ def train_model(args, config, finetune=False):
         tasks = [args.single_task]
     else:
         raise ValueError("Invalid modelling strategy")
-
-    dataloaders = {}
-    print("Instantiating dataloaders...")
-    for task in tasks:
-        if task == "all_tasks" or task == "RNASeq": # special task names
-            dataloaders[task] = []
-            tasks_set = None
-            if args.modelling_strategy == "pretrain+finetune" or args.modelling_strategy == "pretrain+linear_probing":
-                if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq"]
-                elif task == "RNASeq":
-                    tasks_set = ["LL100", "CCLE", "Roadmap"]
-            elif args.modelling_strategy == "joint":
-                if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq", "FluorescenceData"]
-                elif task == "RNASeq":
-                    tasks_set = ["LL100", "CCLE", "Roadmap"]
-
-            for t in tasks_set:
-                if t == "LL100":
-                    dataloaders[task].append(LL100.LL100DataLoader(batch_size=args.batch_size, \
-                                                                    cache_dir=os.path.join(root_data_dir, "LL-100"), \
-                                                                    common_cache_dir=common_cache_dir))
-                elif t == "CCLE":
-                    dataloaders[task].append(CCLE.CCLEDataLoader(batch_size=args.batch_size, \
-                                                                    cache_dir=os.path.join(root_data_dir, "CCLE"), \
-                                                                    common_cache_dir=common_cache_dir))
-                elif t == "Roadmap":
-                    dataloaders[task].append(Roadmap.RoadmapDataLoader(batch_size=args.batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "Roadmap"), \
-                                                                        common_cache_dir=common_cache_dir))
-                elif t == "Sharpr_MPRA":
-                    dataloaders[task].append(Sharpr_MPRA.SharprMPRADataLoader(batch_size=args.batch_size, \
-                                                                                data_dir=os.path.join(root_data_dir, "Sharpr_MPRA")))
-                elif t == "SuRE_classification":
-                    for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
-                        dataloaders[task].append(SuRE.SuREDataLoader(batch_size=args.batch_size, \
-                                                                        genome_id=genome_id, \
-                                                                        cache_dir=os.path.join(root_data_dir, "SuRE"), \
-                                                                        common_cache_dir=common_cache_dir, \
-                                                                        datasets_save_dir=os.path.join(root_data_dir, "SuRE_data"), \
-                                                                        task="classification", \
-                                                                        shrink_test_set=args.shrink_test_set))
-                elif t == "SuRE_regression":
-                    for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
-                        dataloaders[task].append(SuRE.SuREDataLoader(batch_size=args.batch_size, \
-                                                                        genome_id=genome_id, \
-                                                                        cache_dir=os.path.join(root_data_dir, "SuRE"), \
-                                                                        common_cache_dir=common_cache_dir, \
-                                                                        datasets_save_dir=os.path.join(root_data_dir, "SuRE_data"), \
-                                                                        task="regression", \
-                                                                        shrink_test_set=args.shrink_test_set))
-                elif t == "ENCODETFChIPSeq":
-                    dataloaders[task].append(ENCODETFChIPSeq.ENCODETFChIPSeqDataLoader(batch_size=args.batch_size, \
-                                                                                        cache_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq"), \
-                                                                                        common_cache_dir=common_cache_dir, \
-                                                                                        datasets_save_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq_data"), \
-                                                                                        shrink_test_set=args.shrink_test_set, \
-                                                                                        fasta_shuffle_letters_path=args.fasta_shuffle_letters_path))
-                elif t == "lentiMPRA":
-                    dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=args.batch_size, \
-                                                                            cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
-                                                                            common_cache_dir=common_cache_dir))
-                elif t == "STARRSeq":
-                    dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=args.batch_size, \
-                                                                            cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
-                                                                            common_cache_dir=common_cache_dir))
-                elif t == "FluorescenceData":
-                    dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
-                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData")))
-                elif t == "FluorescenceData_DE":
-                    dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
-                                                                        predict_DE=True))
-                elif t == "FluorescenceData_classification":
-                    dataloaders[task].append(FluorescenceData_classification.FluorescenceDataLoader(batch_size=args.batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification")))
-        elif task == "LL100":
-            dataloaders[task] = LL100.LL100DataLoader(batch_size=args.batch_size, \
-                                                        cache_dir=os.path.join(root_data_dir, "LL-100"), \
-                                                        common_cache_dir=common_cache_dir)
-        elif task == "CCLE":
-            dataloaders[task] = CCLE.CCLEDataLoader(batch_size=args.batch_size, \
-                                                    cache_dir=os.path.join(root_data_dir, "CCLE"), \
-                                                    common_cache_dir=common_cache_dir)
-        elif task == "Roadmap":
-            dataloaders[task] = Roadmap.RoadmapDataLoader(batch_size=args.batch_size, \
-                                                            cache_dir=os.path.join(root_data_dir, "Roadmap"), \
-                                                            common_cache_dir=common_cache_dir)
-        elif task == "Sharpr_MPRA":
-            dataloaders[task] = Sharpr_MPRA.SharprMPRADataLoader(batch_size=args.batch_size, \
-                                                                    data_dir=os.path.join(root_data_dir, "Sharpr_MPRA"))
-        elif task == "SuRE_classification":
-            dataloaders[task] = []
-            for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
-                dataloaders[task].append(SuRE.SuREDataLoader(batch_size=args.batch_size, \
-                                                                genome_id=genome_id, \
-                                                                cache_dir=os.path.join(root_data_dir, "SuRE"), \
-                                                                common_cache_dir=common_cache_dir, \
-                                                                datasets_save_dir=os.path.join(root_data_dir, "SuRE_data"), \
-                                                                task="classification", \
-                                                                shrink_test_set=args.shrink_test_set))
-        elif task == "SuRE_regression":
-            dataloaders[task] = []
-            for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
-                dataloaders[task].append(SuRE.SuREDataLoader(batch_size=args.batch_size, \
-                                                                genome_id=genome_id, \
-                                                                cache_dir=os.path.join(root_data_dir, "SuRE"), \
-                                                                common_cache_dir=common_cache_dir, \
-                                                                datasets_save_dir=os.path.join(root_data_dir, "SuRE_data"), \
-                                                                task="regression", \
-                                                                shrink_test_set=args.shrink_test_set))
-        elif task == "ENCODETFChIPSeq":
-            dataloaders[task] = ENCODETFChIPSeq.ENCODETFChIPSeqDataLoader(batch_size=args.batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq"), \
-                                                                        common_cache_dir=common_cache_dir, \
-                                                                        datasets_save_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq_data"), \
-                                                                        shrink_test_set=args.shrink_test_set, \
-                                                                        fasta_shuffle_letters_path=args.fasta_shuffle_letters_path)
-        elif task == "lentiMPRA":
-            dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=args.batch_size, \
-                                                                cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
-                                                                common_cache_dir=common_cache_dir)
-        elif task == "STARRSeq":
-            dataloaders[task] = STARRSeq.STARRSeqDataLoader(batch_size=args.batch_size, \
-                                                                cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
-                                                                common_cache_dir=common_cache_dir)
-        elif task == "FluorescenceData":
-            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"))
-        elif task == "FluorescenceData_DE":
-            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
-                                                                        predict_DE=True)
-        elif task == "FluorescenceData_classification":
-            dataloaders[task] = FluorescenceData_classification.FluorescenceDataLoader(batch_size=args.batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification"))
-        elif task == "FluorescenceData_JURKAT":
-            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
-                                                                        return_specified_cells=0)
-        elif task == "FluorescenceData_K562":
-            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
-                                                                        return_specified_cells=1)
-        elif task == "FluorescenceData_THP1":
-            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=args.batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
-                                                                        return_specified_cells=2)
-    
-    all_dataloaders = []
-    for task in tasks:
-        if dataloaders[task].__class__ == list:
-            all_dataloaders.extend(dataloaders[task])
-        else:
-            all_dataloaders.append(dataloaders[task])
-    print("Total number of dataloaders = {}".format(len(all_dataloaders)))   
 
     # load pretrained model state dict if necessary
     if "pretrain" in args.modelling_strategy and finetune:
@@ -361,6 +204,164 @@ def train_model(args, config, finetune=False):
         name_format = "LegNetLarge_" + name_format
     else:
         raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+
+    # instantiate dataloaders
+    dataloaders = {}
+    print("Instantiating dataloaders...")
+    for task in tasks:
+        if task == "all_tasks" or task == "RNASeq": # special task names
+            dataloaders[task] = []
+            tasks_set = None
+            if args.modelling_strategy == "pretrain+finetune" or args.modelling_strategy == "pretrain+linear_probing":
+                if task == "all_tasks":
+                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq"]
+                elif task == "RNASeq":
+                    tasks_set = ["LL100", "CCLE", "Roadmap"]
+            elif args.modelling_strategy == "joint":
+                if task == "all_tasks":
+                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq", "FluorescenceData"]
+                elif task == "RNASeq":
+                    tasks_set = ["LL100", "CCLE", "Roadmap"]
+
+            for t in tasks_set:
+                if t == "LL100":
+                    dataloaders[task].append(LL100.LL100DataLoader(batch_size=batch_size, \
+                                                                    cache_dir=os.path.join(root_data_dir, "LL-100"), \
+                                                                    common_cache_dir=common_cache_dir))
+                elif t == "CCLE":
+                    dataloaders[task].append(CCLE.CCLEDataLoader(batch_size=batch_size, \
+                                                                    cache_dir=os.path.join(root_data_dir, "CCLE"), \
+                                                                    common_cache_dir=common_cache_dir))
+                elif t == "Roadmap":
+                    dataloaders[task].append(Roadmap.RoadmapDataLoader(batch_size=batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "Roadmap"), \
+                                                                        common_cache_dir=common_cache_dir))
+                elif t == "Sharpr_MPRA":
+                    dataloaders[task].append(Sharpr_MPRA.SharprMPRADataLoader(batch_size=batch_size, \
+                                                                                data_dir=os.path.join(root_data_dir, "Sharpr_MPRA")))
+                elif t == "SuRE_classification":
+                    for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
+                        dataloaders[task].append(SuRE.SuREDataLoader(batch_size=batch_size, \
+                                                                        genome_id=genome_id, \
+                                                                        cache_dir=os.path.join(root_data_dir, "SuRE"), \
+                                                                        common_cache_dir=common_cache_dir, \
+                                                                        datasets_save_dir=os.path.join(root_data_dir, "SuRE_data"), \
+                                                                        task="classification", \
+                                                                        shrink_test_set=args.shrink_test_set))
+                elif t == "SuRE_regression":
+                    for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
+                        dataloaders[task].append(SuRE.SuREDataLoader(batch_size=batch_size, \
+                                                                        genome_id=genome_id, \
+                                                                        cache_dir=os.path.join(root_data_dir, "SuRE"), \
+                                                                        common_cache_dir=common_cache_dir, \
+                                                                        datasets_save_dir=os.path.join(root_data_dir, "SuRE_data"), \
+                                                                        task="regression", \
+                                                                        shrink_test_set=args.shrink_test_set))
+                elif t == "ENCODETFChIPSeq":
+                    dataloaders[task].append(ENCODETFChIPSeq.ENCODETFChIPSeqDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq"), \
+                                                                                        common_cache_dir=common_cache_dir, \
+                                                                                        datasets_save_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq_data"), \
+                                                                                        shrink_test_set=args.shrink_test_set, \
+                                                                                        fasta_shuffle_letters_path=args.fasta_shuffle_letters_path))
+                elif t == "lentiMPRA":
+                    dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
+                                                                            common_cache_dir=common_cache_dir))
+                elif t == "STARRSeq":
+                    dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
+                                                                            common_cache_dir=common_cache_dir))
+                elif t == "FluorescenceData":
+                    dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData")))
+                elif t == "FluorescenceData_DE":
+                    dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
+                                                                        predict_DE=True))
+                elif t == "FluorescenceData_classification":
+                    dataloaders[task].append(FluorescenceData_classification.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification")))
+        elif task == "LL100":
+            dataloaders[task] = LL100.LL100DataLoader(batch_size=batch_size, \
+                                                        cache_dir=os.path.join(root_data_dir, "LL-100"), \
+                                                        common_cache_dir=common_cache_dir)
+        elif task == "CCLE":
+            dataloaders[task] = CCLE.CCLEDataLoader(batch_size=batch_size, \
+                                                    cache_dir=os.path.join(root_data_dir, "CCLE"), \
+                                                    common_cache_dir=common_cache_dir)
+        elif task == "Roadmap":
+            dataloaders[task] = Roadmap.RoadmapDataLoader(batch_size=batch_size, \
+                                                            cache_dir=os.path.join(root_data_dir, "Roadmap"), \
+                                                            common_cache_dir=common_cache_dir)
+        elif task == "Sharpr_MPRA":
+            dataloaders[task] = Sharpr_MPRA.SharprMPRADataLoader(batch_size=batch_size, \
+                                                                    data_dir=os.path.join(root_data_dir, "Sharpr_MPRA"))
+        elif task == "SuRE_classification":
+            dataloaders[task] = []
+            for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
+                dataloaders[task].append(SuRE.SuREDataLoader(batch_size=batch_size, \
+                                                                genome_id=genome_id, \
+                                                                cache_dir=os.path.join(root_data_dir, "SuRE"), \
+                                                                common_cache_dir=common_cache_dir, \
+                                                                datasets_save_dir=os.path.join(root_data_dir, "SuRE_data"), \
+                                                                task="classification", \
+                                                                shrink_test_set=args.shrink_test_set))
+        elif task == "SuRE_regression":
+            dataloaders[task] = []
+            for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
+                dataloaders[task].append(SuRE.SuREDataLoader(batch_size=batch_size, \
+                                                                genome_id=genome_id, \
+                                                                cache_dir=os.path.join(root_data_dir, "SuRE"), \
+                                                                common_cache_dir=common_cache_dir, \
+                                                                datasets_save_dir=os.path.join(root_data_dir, "SuRE_data"), \
+                                                                task="regression", \
+                                                                shrink_test_set=args.shrink_test_set))
+        elif task == "ENCODETFChIPSeq":
+            dataloaders[task] = ENCODETFChIPSeq.ENCODETFChIPSeqDataLoader(batch_size=batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq"), \
+                                                                        common_cache_dir=common_cache_dir, \
+                                                                        datasets_save_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq_data"), \
+                                                                        shrink_test_set=args.shrink_test_set, \
+                                                                        fasta_shuffle_letters_path=args.fasta_shuffle_letters_path)
+        elif task == "lentiMPRA":
+            dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
+                                                                cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
+                                                                common_cache_dir=common_cache_dir)
+        elif task == "STARRSeq":
+            dataloaders[task] = STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
+                                                                cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
+                                                                common_cache_dir=common_cache_dir)
+        elif task == "FluorescenceData":
+            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"))
+        elif task == "FluorescenceData_DE":
+            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
+                                                                        predict_DE=True)
+        elif task == "FluorescenceData_classification":
+            dataloaders[task] = FluorescenceData_classification.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification"))
+        elif task == "FluorescenceData_JURKAT":
+            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
+                                                                        return_specified_cells=0)
+        elif task == "FluorescenceData_K562":
+            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
+                                                                        return_specified_cells=1)
+        elif task == "FluorescenceData_THP1":
+            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
+                                                                        return_specified_cells=2)
+    
+    all_dataloaders = []
+    for task in tasks:
+        if dataloaders[task].__class__ == list:
+            all_dataloaders.extend(dataloaders[task])
+        else:
+            all_dataloaders.append(dataloaders[task])
+    print("Total number of dataloaders = {}".format(len(all_dataloaders)))   
 
     # train models
     all_seeds_r2 = {}
