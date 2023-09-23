@@ -1,5 +1,6 @@
 import numpy as np
 import pdb
+import gc
 
 import torch
 import torch.nn as nn
@@ -299,6 +300,9 @@ class MTLPredictor(pl.LightningModule):
             overall_loss += dl_metrics["val_{}_avg_epoch_loss".format(dl.name)]
 
         self.log("overall_val_loss", overall_loss)
+
+        gc.collect()
+        torch.cuda.empty_cache()
     
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         if self.with_motifs:
@@ -383,6 +387,9 @@ class MTLPredictor(pl.LightningModule):
             overall_loss += dl_metrics["test_{}_avg_epoch_loss".format(dl.name)]
 
         self.log("overall_test_loss", overall_loss)
+
+        gc.collect()
+        torch.cuda.empty_cache()
     
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         if self.with_motifs:
@@ -446,6 +453,9 @@ class MTLPredictor(pl.LightningModule):
         for i in range(len(predict_step_outputs)):
             predict_y[i] = np.vstack(predict_y[i])
             predict_preds[i] = np.vstack(predict_preds[i])
+
+        gc.collect()
+        torch.cuda.empty_cache()
         
         return predict_y, predict_preds
     
