@@ -75,6 +75,7 @@ class lentiMPRADataset(Dataset):
         print("All outputs shape = {}".format(self.all_outputs.shape))
 
         if shrink_set:
+            self.df = self.df.iloc[:10]
             self.all_seqs = self.all_seqs[:10]
             self.all_outputs = self.all_outputs[:10]
             self.valid_outputs_mask = self.valid_outputs_mask[:10]
