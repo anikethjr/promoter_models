@@ -585,7 +585,7 @@ def train_model(args, config, finetune=False):
                                 log_every_n_steps=10, default_root_dir=model_save_dir, \
                                 max_epochs=max_epochs, \
                                 limit_test_batches=0, reload_dataloaders_every_n_epochs=2, enable_progress_bar = True, \
-                                gradient_clip_val=1.0, num_sanity_val_steps=32, precision="bf16")
+                                gradient_clip_val=1.0, num_sanity_val_steps=32, precision=16)
 
             trainer.fit(mtlpredictor, mtlpredictor.get_mtldataloader())
 
