@@ -287,7 +287,7 @@ class MTLPredictor(pl.LightningModule):
                     loss = coeff * l_funcs[dataloader_idx](pred, y) + torch.log(std)
 
         # update metrics
-        self.all_dataloaders[dataloader_idx].update_metrics(pred.cpu().detach(), y.cpu().detach(), loss.cpu().detach(), "val")
+        self.all_dataloaders[dataloader_idx].update_metrics(pred.cpu().detach().float(), y.cpu().detach().float(), loss.cpu().detach().float(), "val")
 
         self.log("{}_val_loss".format(self.all_dataloaders[dataloader_idx].name), loss)
     
@@ -371,7 +371,7 @@ class MTLPredictor(pl.LightningModule):
                     loss = coeff * l_funcs[dataloader_idx](pred, y) + torch.log(std)
         
         # update metrics
-        self.all_dataloaders[dataloader_idx].update_metrics(pred.cpu().detach(), y.cpu().detach(), loss.cpu().detach(), "test")
+        self.all_dataloaders[dataloader_idx].update_metrics(pred.cpu().detach().float(), y.cpu().detach().float(), loss.cpu().detach().float(), "test")
 
         self.log("{}_test_loss".format(self.all_dataloaders[dataloader_idx].name), loss)
         
