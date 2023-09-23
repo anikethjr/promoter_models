@@ -134,12 +134,20 @@ class MTLPredictor(pl.LightningModule):
                                         'loss_weight': torch.tensor(1.0),
                                         'anchor_layer': 'Backbone'
                                     })
-            else:
+            elif task.name.startswith("FluorescenceData"): # only when predicting fluorescence data use MTLFinalPredictor
                 model_config.append({
                                         'name': task.name,
                                         'layers': MTLFinalPredictor(self.backbone_model.embed_dims, task.num_outputs),
                                         'loss': task.loss_fn,
                                         'loss_weight': torch.tensor(0.0),
+                                        'anchor_layer': 'Backbone'
+                                    })
+            else:
+                model_config.append({
+                                        'name': task.name,
+                                        'layers': nn.Linear(self.backbone_model.embed_dims, task.num_outputs),
+                                        'loss': task.loss_fn,
+                                        'loss_weight': torch.tensor(1.0),
                                         'anchor_layer': 'Backbone'
                                     })
         else:

@@ -494,7 +494,8 @@ def train_model(args, config, finetune=False):
         check = False
         if args.use_existing_models:
             if os.path.exists(cur_models_save_dir):
-                if len(os.listdir(cur_models_save_dir)) > 0:
+                done_file = os.path.join(model_save_dir, name, "default", "done.txt")
+                if os.path.exists(done_file):
                     check = True
         if check: # found existing model and using it
             print("Using existing models and evaluating them")
@@ -586,6 +587,11 @@ def train_model(args, config, finetune=False):
                                 gradient_clip_val=1.0, num_sanity_val_steps=32)
 
             trainer.fit(mtlpredictor, mtlpredictor.get_mtldataloader())
+
+            # create done file
+            done_file = os.path.join(model_save_dir, name, "default", "done.txt")
+            with open(done_file, "w+") as f:
+                f.write("done")
 
             wandb.finish()
 
