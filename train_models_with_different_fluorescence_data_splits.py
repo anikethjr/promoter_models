@@ -217,12 +217,12 @@ def train_model(args, config, finetune=False):
             tasks_set = None
             if args.modelling_strategy == "pretrain+finetune" or args.modelling_strategy == "pretrain+linear_probing":
                 if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq"]
+                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "lentiMPRA", "ENCODETFChIPSeq"]
                 elif task == "RNASeq":
                     tasks_set = ["LL100", "CCLE", "Roadmap"]
             elif args.modelling_strategy == "joint":
                 if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq", "FluorescenceData"]
+                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "lentiMPRA", "ENCODETFChIPSeq", "FluorescenceData"]
                 elif task == "RNASeq":
                     tasks_set = ["LL100", "CCLE", "Roadmap"]
 
