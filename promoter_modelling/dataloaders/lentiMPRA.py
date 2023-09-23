@@ -329,12 +329,14 @@ class lentiMPRADataLoader(pl.LightningDataModule):
         self.val_dataset = lentiMPRADataset(self.val_set, "val", self.num_cells, self.cell_names, \
                                                cache_dir=self.cache_dir, use_cache=use_cache, shrink_set=shrink_test_set)
         
+        num_all_pairs = len(self.train_dataset) + len(self.test_dataset) + len(self.val_dataset)
+        
         print("Train set has {} promoter-expression pairs ({:.2f}% of dataset)".format(len(self.train_dataset), \
-                                                                                        100.0*self.train_set.shape[0]/self.final_dataset.shape[0]))
+                                                                                        100.0*self.train_set.shape[0]/num_all_pairs))
         print("Test set has {} promoter-expression pairs ({:.2f}% of dataset)".format(len(self.test_dataset), \
-                                                                                        100.0*self.test_set.shape[0]/self.final_dataset.shape[0]))
+                                                                                        100.0*self.test_set.shape[0]/num_all_pairs))
         print("Val set has {} promoter-expression pairs ({:.2f}% of dataset)".format(len(self.val_dataset), \
-                                                                                        100.0*self.val_set.shape[0]/self.final_dataset.shape[0]))
+                                                                                        100.0*self.val_set.shape[0]/num_all_pairs))
         print("Completed Instantiation of lentiMPRA DataLoader")
     
     def train_dataloader(self):
