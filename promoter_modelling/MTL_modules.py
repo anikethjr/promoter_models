@@ -209,11 +209,11 @@ class MTLPredictor(pl.LightningModule):
                 else:
                     loss += coeff * l_funcs[i](y_hat[i], y) + torch.log(std)
             
-            self.log("{}_train_loss".format(self.all_dataloaders[i].name), loss, on_step=True, on_epoch=True, logger=True)
+            self.log("{}_train_loss".format(self.all_dataloaders[i].name), loss.cpu().detach().float(), on_step=True, on_epoch=True, logger=True)
 
             total_loss += loss
         
-        self.log("train_loss", total_loss, on_step=True, on_epoch=True, logger=True)
+        self.log("train_loss", total_loss.cpu().detach().float(), on_step=True, on_epoch=True, logger=True)
 
         return total_loss
     
@@ -290,7 +290,7 @@ class MTLPredictor(pl.LightningModule):
         # update metrics
         self.all_dataloaders[dataloader_idx].update_metrics(pred.cpu().detach().float(), y.cpu().detach().float(), loss.cpu().detach().float(), "val")
 
-        self.log("{}_val_loss".format(self.all_dataloaders[dataloader_idx].name), loss)
+        self.log("{}_val_loss".format(self.all_dataloaders[dataloader_idx].name), loss.cpu().detach().float())
     
     def on_validation_epoch_end(self):
         overall_loss = 0
@@ -377,7 +377,7 @@ class MTLPredictor(pl.LightningModule):
         # update metrics
         self.all_dataloaders[dataloader_idx].update_metrics(pred.cpu().detach().float(), y.cpu().detach().float(), loss.cpu().detach().float(), "test")
 
-        self.log("{}_test_loss".format(self.all_dataloaders[dataloader_idx].name), loss)
+        self.log("{}_test_loss".format(self.all_dataloaders[dataloader_idx].name), loss.cpu().detach().float())
         
     def test_epoch_end(self, test_step_outputs):        
         overall_loss = 0
