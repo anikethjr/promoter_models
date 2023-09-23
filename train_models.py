@@ -267,7 +267,8 @@ def train_model(args, config, finetune=False):
                 elif t == "lentiMPRA":
                     dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
-                                                                            common_cache_dir=common_cache_dir))
+                                                                            common_cache_dir=common_cache_dir, 
+                                                                            shrink_test_set=args.shrink_test_set))
                 elif t == "STARRSeq":
                     dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
@@ -327,7 +328,8 @@ def train_model(args, config, finetune=False):
         elif task == "lentiMPRA":
             dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
                                                                 cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
-                                                                common_cache_dir=common_cache_dir)
+                                                                common_cache_dir=common_cache_dir, \
+                                                                shrink_test_set=args.shrink_test_set)
         elif task == "STARRSeq":
             dataloaders[task] = STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
                                                                 cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
