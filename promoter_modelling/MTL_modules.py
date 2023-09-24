@@ -426,7 +426,7 @@ class MTLPredictor(pl.LightningModule):
                 y_hat, l_funcs, l_weights = self(X.squeeze(1))            
             pred = y_hat[dataloader_idx]
         
-        return {"y": y, "pred": pred}
+        return {"y": y.cpu().detach().float(), "pred": pred.cpu().detach().float()}
     
     def predict_epoch_end(self, predict_step_outputs):        
         predict_y = []
