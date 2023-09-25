@@ -347,15 +347,15 @@ def train_model(args, config, finetune=False):
         elif task == "FluorescenceData_JURKAT":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
-                                                                        return_specified_cells=0)
+                                                                        return_specified_cells=[0])
         elif task == "FluorescenceData_K562":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
-                                                                        return_specified_cells=1)
+                                                                        return_specified_cells=[1])
         elif task == "FluorescenceData_THP1":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
-                                                                        return_specified_cells=2)
+                                                                        return_specified_cells=[2])
     
     all_dataloaders = []
     for task in tasks:
