@@ -597,7 +597,7 @@ def train_model(args, config, finetune=False):
             wandb.finish()
 
             # get test set predictions
-            best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader())
+            best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader(), ckpt_path="best")
 
         # get metrics
         dataloader_to_outputs = {}

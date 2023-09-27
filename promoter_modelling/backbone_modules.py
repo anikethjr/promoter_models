@@ -13,6 +13,7 @@ import einops
 from rotary_embedding_torch import RotaryEmbedding
 
 from transformers import AutoTokenizer, AutoModel
+from enformer_pytorch import Enformer as BaseEnformer
 
 from tltorch import TRL
 
@@ -250,6 +251,20 @@ class DNABERT(nn.Module):
     def forward(self, seq):
         outs = self.model(seq)
         return outs.pooler_output
+    
+class Enformer(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = BaseEnformer.from_pretrained('EleutherAI/enformer-official-rough', target_length=-1)
+        # # freeze the model
+        # for param in self.model.parameters():
+        #     param.requires_grad = False
+        self.embed_dims = 2*self.model.dim
+
+    def forward(self, seq):
+        outs = self.model(seq, return_only_embeddings=True)
+        outs = outs.mean(dim=1)
+        return outs
 
 # architecture from Agarwal et al. (2023)
 # https://doi.org/10.1101%2F2023.03.05.531189

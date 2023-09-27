@@ -10,5 +10,5 @@ setuptools.setup(
                       "torch", "torchmtl", "lightning", \
                       "kipoiseq", "pyfaidx", "joblib", \
                       "transformers", "tensorly", "tensorly-torch", "odfpy", \
-                      "biopython", "einsum", "rotary-embedding-torch"]
+                      "biopython", "einsum", "rotary-embedding-torch", "enformer-pytorch"]
 )

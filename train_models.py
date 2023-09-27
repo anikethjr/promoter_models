@@ -94,6 +94,9 @@ def train_model(args, config, finetune=False):
         elif args.model_name == "DNABERT":
             model_class = backbone_modules.DNABERT
             pretrained_model_name = "DNABERT_" + pretrained_model_name
+        elif args.model_name == "Enformer":
+            model_class = backbone_modules.Enformer
+            pretrained_model_name = "Enformer_" + pretrained_model_name
         elif args.model_name == "LegNet":
             model_class = backbone_modules.LegNet
             pretrained_model_name = "LegNet_" + pretrained_model_name
@@ -101,7 +104,7 @@ def train_model(args, config, finetune=False):
             model_class = backbone_modules.LegNetLarge
             pretrained_model_name = "LegNetLarge_" + pretrained_model_name
         else:
-            raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+            raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'Enformer', 'LegNet' or 'LegNetLarge'")
         pretrain_metric_direction_which_is_optimal = args.pretrain_metric_direction_which_is_optimal
         pretrained_model_save_dir = os.path.join(model_save_dir, pretrained_model_name, "default", "checkpoints")
 
@@ -196,6 +199,9 @@ def train_model(args, config, finetune=False):
     elif args.model_name == "DNABERT":
         model_class = backbone_modules.DNABERT
         name_format = "DNABERT_" + name_format
+    elif args.model_name == "Enformer":
+        model_class = backbone_modules.Enformer
+        name_format = "Enformer_" + name_format
     elif args.model_name == "LegNet":
         model_class = backbone_modules.LegNet
         name_format = "LegNet_" + name_format
@@ -203,7 +209,7 @@ def train_model(args, config, finetune=False):
         model_class = backbone_modules.LegNetLarge
         name_format = "LegNetLarge_" + name_format
     else:
-        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'Enformer', 'LegNet' or 'LegNetLarge'")
 
     # instantiate dataloaders
     dataloaders = {}
@@ -507,7 +513,7 @@ def train_model(args, config, finetune=False):
                                 log_every_n_steps=10, default_root_dir=model_save_dir, \
                                 max_epochs=max_epochs, \
                                 limit_test_batches=0, reload_dataloaders_every_n_epochs=2, enable_progress_bar = True, \
-                                gradient_clip_val=1.0, num_sanity_val_steps=32, precision="16-mixed")
+                                gradient_clip_val=1.0, num_sanity_val_steps=32)
 
             trainer.fit(mtlpredictor, mtlpredictor.get_mtldataloader())
 
@@ -519,7 +525,7 @@ def train_model(args, config, finetune=False):
             wandb.finish()
 
             # get test set predictions
-            best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader())
+            best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader(), ckpt_path="best")
 
         # get metrics
         dataloader_to_outputs = {}
@@ -838,7 +844,7 @@ def train_model(args, config, finetune=False):
 
 args = argparse.ArgumentParser()
 args.add_argument("--config_path", type=str, default="./config.json", help="Path to config file")
-args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'Enformer', 'LegNet' or 'LegNetLarge'")
 args.add_argument("--modelling_strategy", type=str, required=True, help="Modelling strategy to use, either 'joint', 'pretrain+finetune', 'pretrain+linear_probing' or 'single_task'")
 
 args.add_argument("--joint_tasks", type=str, default=None, help="Comma separated list of tasks to jointly train on")
