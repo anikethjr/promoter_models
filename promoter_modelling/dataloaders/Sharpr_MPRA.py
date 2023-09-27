@@ -92,7 +92,7 @@ class SharprMPRADataLoader(pl.LightningDataModule):
     def __init__(self, \
                  batch_size, \
                  data_dir, \
-                 n_cpus = 8):
+                 n_cpus = 0):
         super().__init__()
 
         np.random.seed(97)

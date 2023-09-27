@@ -492,7 +492,7 @@ class SuREDataLoader(pl.LightningDataModule):
                  common_cache_dir, \
                  datasets_save_dir, \
                  task="classification", \
-                 n_cpus=8, \
+                 n_cpus=0, \
                  num_train=250000*3, \
                  num_val=25000*3, \
                  num_test=25000*3, \

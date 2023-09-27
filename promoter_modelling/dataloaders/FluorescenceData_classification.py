@@ -124,7 +124,7 @@ class FluorescenceDataLoader(pl.LightningDataModule):
                  batch_size, \
                  cache_dir, \
                  seed = None, \
-                 n_cpus = 8, \
+                 n_cpus = 0, \
                  min_reads = 5, \
                  train_fraction = 0.7, \
                  val_fraction = 0.1, \

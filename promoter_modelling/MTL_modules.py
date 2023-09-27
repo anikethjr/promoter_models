@@ -82,7 +82,7 @@ class MTLPredictor(pl.LightningModule):
                  all_dataloader_modules, \
                  batch_size, \
                  max_epochs=None, \
-                 n_cpus=8, \
+                 n_cpus=0, \
                  lr=1e-5, \
                  weight_decay=1e-4, \
                  with_motifs=False, \
