@@ -255,6 +255,13 @@ class DNABERT(nn.Module):
 class Enformer(nn.Module):
     def __init__(self):
         super().__init__()
+        # self.model = BaseEnformer.from_hparams(
+        #                                             dim = 1536,
+        #                                             depth = 11,
+        #                                             heads = 8,
+        #                                             output_heads = dict(flu = 3),
+        #                                             target_length = 2,
+        #                                         )
         self.model = BaseEnformer.from_pretrained('EleutherAI/enformer-official-rough', target_length=-1)
         # # freeze the model
         # for param in self.model.parameters():
