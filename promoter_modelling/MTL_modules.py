@@ -111,15 +111,15 @@ class MTLPredictor(pl.LightningModule):
         self.with_motifs = with_motifs        
         if self.with_motifs:
             self.num_motifs = self.all_dataloaders[0].num_motifs
-            self.backbone_model = model_class(num_motifs=self.num_motifs)
+            self.backbone = model_class(num_motifs=self.num_motifs)
         else:
-            self.backbone_model = model_class()
+            self.backbone = model_class()
             
         # create MTL model
         model_config = [
                             {
                                 'name': "Backbone",
-                                'layers': self.backbone_model,
+                                'layers': self.backbone,
                                 # No anchor_layer means this layer receives input directly
                             }
                         ]
@@ -130,7 +130,7 @@ class MTLPredictor(pl.LightningModule):
             if model_class == MPRAnn: # MPRAnn has a single linear layer at the end
                 model_config.append({
                                         'name': task.name,
-                                        'layers': nn.Linear(self.backbone_model.embed_dims, task.num_outputs),
+                                        'layers': nn.Linear(self.backbone.embed_dims, task.num_outputs),
                                         'loss': task.loss_fn,
                                         'loss_weight': torch.tensor(1.0),
                                         'anchor_layer': 'Backbone'
@@ -138,7 +138,7 @@ class MTLPredictor(pl.LightningModule):
             elif task.name.startswith("FluorescenceData"): # only when predicting fluorescence data use MTLFinalPredictor
                 model_config.append({
                                         'name': task.name,
-                                        'layers': MTLFinalPredictor(self.backbone_model.embed_dims, task.num_outputs),
+                                        'layers': MTLFinalPredictor(self.backbone.embed_dims, task.num_outputs),
                                         'loss': task.loss_fn,
                                         'loss_weight': torch.tensor(0.0),
                                         'anchor_layer': 'Backbone'
@@ -146,7 +146,7 @@ class MTLPredictor(pl.LightningModule):
             else:
                 model_config.append({
                                         'name': task.name,
-                                        'layers': nn.Linear(self.backbone_model.embed_dims, task.num_outputs),
+                                        'layers': nn.Linear(self.backbone.embed_dims, task.num_outputs),
                                         'loss': task.loss_fn,
                                         'loss_weight': torch.tensor(1.0),
                                         'anchor_layer': 'Backbone'
@@ -155,7 +155,7 @@ class MTLPredictor(pl.LightningModule):
             for i, task in enumerate(self.all_dataloaders):
                 model_config.append({
                                         'name': task.name,
-                                        'layers': nn.Linear(self.backbone_model.embed_dims, task.num_outputs),
+                                        'layers': nn.Linear(self.backbone.embed_dims, task.num_outputs),
                                         'loss': task.loss_fn,
                                         # 'loss_weight': torch.tensor(0.0),
                                         'loss_weight': 'auto',
@@ -460,11 +460,11 @@ class MTLPredictor(pl.LightningModule):
         return predict_y, predict_preds
     
     def configure_optimizers(self):
-        # if backbone_model is of type backbone_modules.LegNet, use AdamW + OneCycleLR
-        if isinstance(self.backbone_model, LegNet) or isinstance(self.backbone_model, LegNetLarge):
+        # if backbone is of type backbone_modules.LegNet, use AdamW + OneCycleLR
+        if isinstance(self.backbone, LegNet) or isinstance(self.backbone, LegNetLarge):
             div_factor = 25
             print("Using AdamW + OneCycleLR min_lr = {} max_lr = {} weight_decay = {}".format(self.lr / div_factor, self.lr, self.weight_decay))
-            optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr / div_factor, weight_decay=self.weight_decay)
+            optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr / div_factor, weight_decay=self.weight_decay)
             scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, 
                                                 max_lr=self.lr,
                                                 div_factor=div_factor,
@@ -473,11 +473,11 @@ class MTLPredictor(pl.LightningModule):
                                                 pct_start=0.3,
                                                 three_phase="store_true")
             return [optimizer], [scheduler]
-        elif isinstance(self.backbone_model, MPRAnn):
+        elif isinstance(self.backbone, MPRAnn):
             print("Using Adam lr = {}".format(self.lr))
-            optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
             return optimizer
 
         print("Using AdamW lr = {} weight_decay = {}".format(self.lr, self.weight_decay))
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr, weight_decay=self.weight_decay)
         return optimizer

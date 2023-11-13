@@ -37,6 +37,46 @@ class CNNBlock(nn.Module):
         
         return x
     
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, gn_num_groups=None, gn_group_size=16):
+        super().__init__()
+
+        stride_for_conv1_and_shortcut = 1
+
+        if in_channels != out_channels:
+            stride_for_conv1_and_shortcut = 2
+
+        padding = kernel_size // 2
+
+        if gn_num_groups is None:
+            gn_num_groups = out_channels // gn_group_size
+
+        # modules for processing the input
+        self.conv1 = nn.Conv1d(in_channels = in_channels, out_channels = out_channels, kernel_size = kernel_size, stride = stride_for_conv1_and_shortcut, padding = padding, bias=False)
+        self.gn1 = nn.GroupNorm(gn_num_groups, out_channels)
+        self.relu1 = nn.ReLU(inplace=True)
+
+        self.conv2 = nn.Conv1d(in_channels = out_channels, out_channels = out_channels, kernel_size = kernel_size, stride = 1, padding = "same", bias=False)
+        self.gn2 = nn.GroupNorm(gn_num_groups, out_channels)
+        self.relu2 = nn.ReLU(inplace=True)
+
+        # short cut connections
+        self.shortcut = nn.Identity()
+        if in_channels != out_channels:
+            self.shortcut = nn.Conv1d(in_channels = in_channels, out_channels = out_channels, kernel_size = 1, stride = stride_for_conv1_and_shortcut, bias=False)
+
+    def forward(self, xl):
+        input = self.shortcut(xl)
+
+        xl = self.relu1(self.gn1(self.conv1(xl)))
+        xl = self.conv2(xl)
+
+        xlp1 = input + xl
+
+        xlp1 = self.relu2(self.gn2(xlp1))
+
+        return xlp1
+    
 class TransformerBlock(nn.Module):
     def __init__(self, d_model, nhead, mlp_dim, dropout=0.1, use_position_embedding=True):
         assert d_model % nhead == 0
@@ -103,7 +143,7 @@ class TransformerBlock(nn.Module):
         x = x + mlp_inputs
 
         return x
-
+    
 class MTLucifer(nn.Module):
     def __init__(self, nucleotide_embed_dims=1024, nheads=8, mlp_dim_ratio=4):
         super().__init__()
@@ -117,6 +157,38 @@ class MTLucifer(nn.Module):
                                             CNNBlock(in_channels = 4, out_channels = 256, kernel_size = 5, stride = 1, bias=True),
                                             CNNBlock(in_channels = 256, out_channels = 512, kernel_size = 5, stride = 1, bias=True),
                                             CNNBlock(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5, stride = 1, bias=True)
+                                         )
+        self.promoter_transformer = nn.Sequential(
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim)
+                                        )
+        
+    def forward(self, seq):
+        seq = seq.permute(0, 2, 1)
+        seq = self.promoter_cnn(seq)
+        seq = seq.permute(0, 2, 1)
+        seq = torch.hstack([self.cls_token_embedding.expand(seq.shape[0], -1, -1), seq])
+        outs = self.promoter_transformer(seq)[:, 0]
+
+        return outs
+
+class MTLuciferWithResidualBlocks(nn.Module):
+    def __init__(self, nucleotide_embed_dims=1024, nheads=8, mlp_dim_ratio=4):
+        super().__init__()
+        self.nheads = nheads
+        self.cls_token_embedding = nn.Parameter(torch.normal(mean=0.0, std=0.02, size=(1, 1, nucleotide_embed_dims)))
+        self.embed_dims = nucleotide_embed_dims
+        self.nheads = nheads
+        self.mlp_dim = nucleotide_embed_dims * mlp_dim_ratio
+        
+        self.promoter_cnn = nn.Sequential(
+                                            CNNBlock(in_channels = 4, out_channels = 256, kernel_size = 20),
+                                            ResidualBlock(in_channels = 256, out_channels = 256, kernel_size = 5),
+                                            ResidualBlock(in_channels = 256, out_channels = 512, kernel_size = 5),
+                                            ResidualBlock(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5)
                                          )
         self.promoter_transformer = nn.Sequential(
                                             TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
