@@ -54,7 +54,7 @@ class MalinoisMPRADataset(Dataset):
         # create outputs
         self.all_outputs = {}
         for cell in self.cell_names:
-            self.all_outputs[cell] = np.array(self.df[cell].values, dtype=np.float32)
+            self.all_outputs[cell] = np.array(self.df[cell + "_log2FoldChange"].values, dtype=np.float32)
         
         # create mask since not all sequences have outputs for all cells
         self.valid_outputs_mask = []
