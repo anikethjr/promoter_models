@@ -338,7 +338,7 @@ class Enformer(nn.Module):
         # # freeze the model
         # for param in self.model.parameters():
         #     param.requires_grad = False
-        self.embed_dims = self.model.dim
+        self.embed_dims = self.model.dim*2
         self.attention_pool = nn.Linear(self.embed_dims, 1)
 
     def forward(self, seq):
