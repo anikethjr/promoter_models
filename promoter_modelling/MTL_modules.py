@@ -76,7 +76,7 @@ batch_size: batch size to be used for training
 '''
 
 # maybe make loss_fn and task_type attributes of individual dataloaders?
-class MTLPredictor(pl.LightningModule):
+class MTLPredictor(pl.core.LightningModule):
     def __init__(self, \
                  model_class, \
                  all_dataloader_modules, \
