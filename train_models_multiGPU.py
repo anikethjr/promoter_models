@@ -517,7 +517,7 @@ def train_model(args, config, finetune=False):
             trainer = pl.Trainer(logger=wandb_logger, \
                                 callbacks=[early_stop_callback, checkpoint_callback], \
                                 deterministic=True, \
-                                accelerator="gpu", strategy="dp", devices=-1, \
+                                accelerator="gpu", strategy="ddp_spawn", devices=-1, \
                                 log_every_n_steps=10, default_root_dir=model_save_dir, \
                                 max_epochs=max_epochs, \
                                 limit_test_batches=0, reload_dataloaders_every_n_epochs=2, enable_progress_bar = True, \
