@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-import lightning.pytorch as pl
+import lightning as L
 
 import torchmetrics
 
@@ -97,7 +97,7 @@ class FluorescenceDataset(Dataset):
         return self.all_seqs[idx], \
                self.y[idx]
 
-class FluorescenceDataLoader(pl.LightningDataModule):    
+class FluorescenceDataLoader(L.LightningDataModule):    
     def download_data(self):
         if not os.path.exists(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv")):
             os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=15p6GhDop5BsUPryZ6pfKgwJ2XEVHRAYq' -O {}".format(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv")))

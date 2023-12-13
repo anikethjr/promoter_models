@@ -12,7 +12,7 @@ from sklearn.metrics import r2_score, accuracy_score, precision_score, recall_sc
 
 import torch
 
-import pytorch_lightning as pl
+import lightning as L
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -539,7 +539,7 @@ def train_model(args, config, finetune=False):
             print("Loaded existing model")
             
             # get test set predictions
-            trainer = pl.Trainer(accelerator="gpu", devices=1)
+            trainer = L.Trainer(accelerator="gpu", devices=1)
             best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader())
 
         else:
@@ -579,7 +579,7 @@ def train_model(args, config, finetune=False):
             early_stop_callback = EarlyStopping(monitor=metric_to_monitor, min_delta=0.00, \
                                                 patience=patience, verbose=True, mode=metric_direction_which_is_optimal)
 
-            trainer = pl.Trainer(logger=wandb_logger, \
+            trainer = L.Trainer(logger=wandb_logger, \
                                 callbacks=[early_stop_callback, checkpoint_callback], \
                                 deterministic=True, accelerator="gpu", devices=1, \
                                 log_every_n_steps=10, default_root_dir=model_save_dir, \

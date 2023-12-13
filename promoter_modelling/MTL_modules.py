@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import lightning.pytorch as pl
+import lightning as L
 from lightning.pytorch.utilities.combined_loader import CombinedLoader
 
 import torchmtl
@@ -17,7 +17,7 @@ np.random.seed(97)
 torch.manual_seed(97)
 
 # combines multiple dataloaders into one
-class MTLDataLoader(pl.LightningDataModule):
+class MTLDataLoader(L.LightningDataModule):
     # change min_size to max_size_cycle to iterate through largest dataset fully during each training epoch
     # more details: https://github.com/Lightning-AI/lightning/blob/15ef52bc732d1f907de4de58683f131652c0d68c/src/pytorch_lightning/trainer/supporters.py
     def __init__(self, all_dataloaders, train_mode="min_size", return_full_dataset_for_predict=False):
@@ -76,7 +76,7 @@ batch_size: batch size to be used for training
 '''
 
 # maybe make loss_fn and task_type attributes of individual dataloaders?
-class MTLPredictor(pl.core.LightningModule):
+class MTLPredictor(L.LightningModule):
     def __init__(self, \
                  model_class, \
                  all_dataloader_modules, \

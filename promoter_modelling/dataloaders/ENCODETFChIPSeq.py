@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils import data
 from torch.utils.data import Dataset, DataLoader
-import lightning.pytorch as pl
+import lightning as L
 
 import torchmetrics
 
@@ -178,7 +178,7 @@ class ENCODETFChIPSeqDataset(Dataset):
         return seq, targets, mask
     
 # class used to read, process and build train, val, test sets using the ENCODE TF-ChIP-Seq datasets
-class ENCODETFChIPSeqDataLoader(pl.LightningDataModule):
+class ENCODETFChIPSeqDataLoader(L.LightningDataModule):
     def update_metrics(self, y_hat, y, loss, split):
         self.all_metrics[split]["{}_avg_epoch_loss".format(self.name)].update(loss)
 

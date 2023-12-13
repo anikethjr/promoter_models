@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-import lightning.pytorch as pl
+import lightning as L
 
 import torchmetrics
 
@@ -130,7 +130,7 @@ class LL100PredictDataset(Dataset):
 
 
 # class used to read, process and build train, val, test sets using the LL-100 dataset
-class LL100DataLoader(pl.LightningDataModule):
+class LL100DataLoader(L.LightningDataModule):
     def download_data(self):
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)

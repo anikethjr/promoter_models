@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
-import lightning.pytorch as pl
+import lightning as L
 
 import torchmetrics
 
@@ -77,7 +77,7 @@ def pad_collate(batch):
     
     return seq, targets, mask
     
-class STARRSeqDataLoader(pl.LightningDataModule):
+class STARRSeqDataLoader(L.LightningDataModule):
     def download_data(self):
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)

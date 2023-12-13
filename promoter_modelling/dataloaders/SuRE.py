@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
-import lightning.pytorch as pl
+import lightning as L
 
 import torchmetrics
 
@@ -417,7 +417,7 @@ def pad_collate(batch):
 # and there are multiple data columns with read counts (depending on how many replicates were used) - 
 # SuRE*_*HEPG2* are for HepG2
 # other SuRE*_* columns are for K562
-class SuREDataLoader(pl.LightningDataModule):
+class SuREDataLoader(L.LightningDataModule):
     def download_data(self):
         download_path = None
         if self.genome_id == "SuRE42_HG02601":

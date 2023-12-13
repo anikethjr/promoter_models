@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
-import lightning.pytorch as pl
+import lightning as L
 
 import torchmetrics
 
@@ -86,7 +86,7 @@ class MalinoisMPRADataset(Dataset):
         return self.all_seqs[idx], self.all_outputs[idx], self.valid_outputs_mask[idx]
 
 
-class MalinoisMPRADataLoader(pl.LightningDataModule):
+class MalinoisMPRADataLoader(L.LightningDataModule):
     def download_data(self):
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)
