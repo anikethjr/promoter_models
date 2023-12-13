@@ -18,7 +18,7 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from promoter_modelling.dataloaders import FluorescenceData, FluorescenceData_classification, FluorescenceData_with_motifs, FluorescenceData_DNABERT, \
-                                           LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, STARRSeq
+                                           LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, STARRSeq, Malinois_MPRA
 from promoter_modelling import backbone_modules
 from promoter_modelling import MTL_modules
 

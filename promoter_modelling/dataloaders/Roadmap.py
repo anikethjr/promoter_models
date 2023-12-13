@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 
 from promoter_modelling.utils import fasta_utils
 

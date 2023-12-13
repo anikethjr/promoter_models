@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import pytorch_lightning as pl
-from pytorch_lightning.utilities.combined_loader import CombinedLoader
+import lightning.pytorch as pl
+from lightning.pytorch.utilities.combined_loader import CombinedLoader
 
 import torchmtl
 
@@ -135,14 +135,14 @@ class MTLPredictor(pl.LightningModule):
                                         'loss_weight': torch.tensor(1.0),
                                         'anchor_layer': 'Backbone'
                                     })
-            elif task.name.startswith("FluorescenceData"): # only when predicting fluorescence data use MTLFinalPredictor
-                model_config.append({
-                                        'name': task.name,
-                                        'layers': MTLFinalPredictor(self.backbone.embed_dims, task.num_outputs),
-                                        'loss': task.loss_fn,
-                                        'loss_weight': torch.tensor(0.0),
-                                        'anchor_layer': 'Backbone'
-                                    })
+            # elif task.name.startswith("FluorescenceData"): # only when predicting fluorescence data use MTLFinalPredictor
+            #     model_config.append({
+            #                             'name': task.name,
+            #                             'layers': MTLFinalPredictor(self.backbone.embed_dims, task.num_outputs),
+            #                             'loss': task.loss_fn,
+            #                             'loss_weight': torch.tensor(0.0),
+            #                             'anchor_layer': 'Backbone'
+            #                         })
             else:
                 model_config.append({
                                         'name': task.name,
