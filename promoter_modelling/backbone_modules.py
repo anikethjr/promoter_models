@@ -20,6 +20,40 @@ from tltorch import TRL
 np.random.seed(97)
 torch.manual_seed(97)
 
+def get_backbone_class(backbone_name):
+    if backbone_name == "MTLucifer":
+        return MTLucifer
+    elif backbone_name == "MTLuciferWithResidualBlocks":
+        return MTLuciferWithResidualBlocks
+    elif backbone_name == "PureCNN":
+        return PureCNN
+    elif backbone_name == "PureCNNLarge":
+        return PureCNNLarge
+    elif backbone_name == "ResNet":
+        return ResNet
+    elif backbone_name == "MotifBasedFCN":
+        return MotifBasedFCN
+    elif backbone_name == "MotifBasedFCNLarge":
+        return MotifBasedFCNLarge
+    elif backbone_name == "DNABERT":
+        return DNABERT
+    elif backbone_name == "Enformer":
+        return Enformer
+    elif backbone_name == "EnformerRandomInit":
+        return EnformerRandomInit
+    elif backbone_name == "MPRAnn":
+        return MPRAnn
+    elif backbone_name == "LegNetOriginal":
+        return LegNetOriginal
+    elif backbone_name == "LegNet":
+        return LegNet
+    else:
+        raise ValueError("Backbone name not recognized")
+    
+def get_all_backbone_names():
+    return ["MTLucifer", "MTLuciferWithResidualBlocks", "PureCNN", "PureCNNLarge", "ResNet", "MotifBasedFCN", "MotifBasedFCNLarge", "DNABERT", "Enformer", "EnformerRandomInit", "MPRAnn", "LegNetOriginal", "LegNet"]
+
+
 class CNNBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding="same", dilation=1, bias=True, gn_num_groups=None, gn_group_size=16):
         super().__init__()

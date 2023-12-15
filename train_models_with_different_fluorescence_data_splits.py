@@ -77,37 +77,10 @@ def train_model(args, config, finetune=False):
 
         pretrained_model_name = "pretrain_on_{}".format("+".join(pretrain_tasks))
         # map to model classes
-        if args.model_name == "MTLucifer":
-            model_class = backbone_modules.MTLucifer
-        elif args.model_name == "PureCNN":
-            model_class = backbone_modules.PureCNN
-            pretrained_model_name = "PureCNN_" + pretrained_model_name
-        elif args.model_name == "PureCNNLarge":
-            model_class = backbone_modules.PureCNNLarge
-            pretrained_model_name = "PureCNNLarge_" + pretrained_model_name
-        elif args.model_name == "MotifBasedFCN":
-            model_class = backbone_modules.MotifBasedFCN
-            pretrained_model_name = "MotifBasedFCN_" + pretrained_model_name
-        elif args.model_name == "MotifBasedFCNLarge":
-            model_class = backbone_modules.MotifBasedFCNLarge
-            pretrained_model_name = "MotifBasedFCNLarge_" + pretrained_model_name
-        elif args.model_name == "MPRAnn":
-            model_class = backbone_modules.MPRAnn
-            pretrained_model_name = "MPRAnn_" + pretrained_model_name
-        elif args.model_name == "DNABERT":
-            model_class = backbone_modules.DNABERT
-            pretrained_model_name = "DNABERT_" + pretrained_model_name
-        elif args.model_name == "LegNet":
-            model_class = backbone_modules.LegNet
-            pretrained_model_name = "LegNet_" + pretrained_model_name
-        elif args.model_name == "LegNetLarge":
-            model_class = backbone_modules.LegNetLarge
-            pretrained_model_name = "LegNetLarge_" + pretrained_model_name
-        elif args.model_name == "EnformerRandomInit":
-            model_class = backbone_modules.EnformerRandomInit
-            pretrained_model_name = "EnformerRandomInit_" + pretrained_model_name        
-        else:
-            raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet', 'LegNetLarge', or 'EnformerRandomInit'")
+        model_class = backbone_modules.get_backbone_class(args.model_name)
+        if args.model_name != "MTLucifer":
+            pretrained_model_name = f"{args.model_name}_" + pretrained_model_name
+
         pretrain_metric_direction_which_is_optimal = args.pretrain_metric_direction_which_is_optimal
         pretrained_model_save_dir = os.path.join(model_save_dir, pretrained_model_name, "default", "checkpoints")
 
@@ -182,37 +155,9 @@ def train_model(args, config, finetune=False):
         name_format = "individual_training_on_{}".format("+".join(tasks))
     
     # map to model classes
-    if args.model_name == "MTLucifer":
-        model_class = backbone_modules.MTLucifer
-    elif args.model_name == "PureCNN":
-        model_class = backbone_modules.PureCNN
-        name_format = "PureCNN_" + name_format
-    elif args.model_name == "PureCNNLarge":
-        model_class = backbone_modules.PureCNNLarge
-        name_format = "PureCNNLarge_" + name_format
-    elif args.model_name == "MotifBasedFCN":
-        model_class = backbone_modules.MotifBasedFCN
-        name_format = "MotifBasedFCN_" + name_format
-    elif args.model_name == "MotifBasedFCNLarge":
-        model_class = backbone_modules.MotifBasedFCNLarge
-        name_format = "MotifBasedFCNLarge_" + name_format
-    elif args.model_name == "MPRAnn":
-        model_class = backbone_modules.MPRAnn
-        name_format = "MPRAnn_" + name_format
-    elif args.model_name == "DNABERT":
-        model_class = backbone_modules.DNABERT
-        name_format = "DNABERT_" + name_format
-    elif args.model_name == "LegNet":
-        model_class = backbone_modules.LegNet
-        name_format = "LegNet_" + name_format
-    elif args.model_name == "LegNetLarge":
-        model_class = backbone_modules.LegNetLarge
-        name_format = "LegNetLarge_" + name_format
-    elif args.model_name == "EnformerRandomInit":
-        model_class = backbone_modules.EnformerRandomInit
-        name_format = "EnformerRandomInit_" + name_format
-    else:
-        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet', 'LegNetLarge', or 'EnformerRandomInit'")
+    model_class = backbone_modules.get_backbone_class(args.model_name)
+    if args.model_name != "MTLucifer":
+        name_format = f"{args.model_name}_" + name_format
     
     # instantiate dataloaders
     dataloaders = {}
@@ -860,7 +805,7 @@ def train_model(args, config, finetune=False):
 
 args = argparse.ArgumentParser()
 args.add_argument("--config_path", type=str, default="./config.json", help="Path to config file")
-args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet', 'LegNetLarge', or 'EnformerRandomInit'")
+args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, must be one of {}".format(backbone_modules.get_all_backbone_names()))
 args.add_argument("--modelling_strategy", type=str, required=True, help="Modelling strategy to use, either 'joint', 'pretrain+finetune', 'pretrain+linear_probing' or 'single_task'")
 
 args.add_argument("--joint_tasks", type=str, default=None, help="Comma separated list of tasks to jointly train on")
