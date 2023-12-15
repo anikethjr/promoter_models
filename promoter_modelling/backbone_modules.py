@@ -261,6 +261,35 @@ class PureCNNLarge(nn.Module):
         seq2 = F.relu(seq1)
         outs = self.linear2(seq2)
         return outs
+    
+class ResNet(nn.Module):
+    def __init__(self, embed_dims=1024):
+        super().__init__()
+        self.embed_dims = embed_dims
+        
+        self.initial_conv = nn.Conv1d(in_channels=4, out_channels=512, kernel_size=5, stride=1, padding=1, bias=False)
+        self.resnet = nn.Sequential(
+                                        ResidualBlock(in_channels=512, out_channels=512, kernel_size=5),
+                                        ResidualBlock(in_channels=512, out_channels=512, kernel_size=5),
+                                        ResidualBlock(in_channels=512, out_channels=768, kernel_size=5),
+                                        ResidualBlock(in_channels=768, out_channels=768, kernel_size=5),
+                                        ResidualBlock(in_channels=768, out_channels=1024, kernel_size=5),
+                                        ResidualBlock(in_channels=1024, out_channels=1024, kernel_size=5),
+                                        ResidualBlock(in_channels=1024, out_channels=2048, kernel_size=5),
+                                        ResidualBlock(in_channels=2048, out_channels=2048, kernel_size=5)
+                                   )
+
+        self.adaptive_pool = nn.AdaptiveAvgPool1d(1)
+        self.linear = nn.Linear(2048, self.embed_dims)
+
+    def forward(self, seq):
+        seq = seq.permute(0, 2, 1)
+        seq = self.initial_conv(seq)
+        seq = self.resnet(seq)
+        seq = self.adaptive_pool(seq)
+        seq = seq.reshape(seq.shape[0], -1)
+        outs = self.linear(seq)
+        return outs
 
 class MotifBasedFCN(nn.Module):
     def __init__(self, num_motifs, motif_embed_dims=512):
