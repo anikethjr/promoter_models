@@ -208,6 +208,14 @@ class FluorescenceDataLoader(L.LightningDataModule):
                     self.measurements["keep"] = self.measurements["keep"] & (self.measurements[col] >= min_reads)
             self.measurements = self.measurements[self.measurements["keep"]].drop("keep", axis=1).reset_index(drop=True)
             
+            # divide the read counts by the total number of reads across sequences
+            for col in self.measurements.columns:
+                if not (col.endswith("_sum") or col == "sequence"):
+                    print("Normalizing {}, sum before = {}".format(col, self.measurements[col].sum()))
+                    self.measurements[col] = self.measurements[col] + 1.0 # pseudocount
+                    self.measurements[col] = self.measurements[col] / self.measurements[col].sum() # normalize
+                    print("After normalizing {}, sum = {}".format(col, self.measurements[col].sum()))
+            
             for cell in self.cell_names:
                 first_letter_of_cell_name = cell[:1]
                 self.measurements[cell] = 0
@@ -217,15 +225,15 @@ class FluorescenceDataLoader(L.LightningDataModule):
                         other_cells_first_letters = [c[:1] for c in other_cells]
                         avg_ratio = 0
                         for other_cell, other_cell_first_letter in zip(other_cells, other_cells_first_letters):
-                            avg_ratio += (self.measurements["{}{}_P4".format(other_cell_first_letter, rep+1)] + 1) / (self.measurements["{}{}_P7".format(other_cell_first_letter, rep+1)] + 1)
+                            avg_ratio += (self.measurements["{}{}_P4".format(other_cell_first_letter, rep+1)]) / (self.measurements["{}{}_P7".format(other_cell_first_letter, rep+1)])
                         avg_ratio /= len(other_cells)
 
-                        cur_ratio = (self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)] + 1) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)] + 1)
+                        cur_ratio = (self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)]) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)])
 
                         # DE = ratio of P4 to P7 in cell of interest / ratio of P4 to P7 in other cells
                         self.measurements[cell] += np.log2(cur_ratio / avg_ratio)
                     else:
-                        self.measurements[cell] += np.log2((self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)] + 1) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)] + 1))
+                        self.measurements[cell] += np.log2((self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)]) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)]))
                 self.measurements[cell] /= self.num_replicates
 
             if self.zscore:
