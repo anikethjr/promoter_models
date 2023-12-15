@@ -327,17 +327,30 @@ class DNABERT(nn.Module):
 class Enformer(nn.Module):
     def __init__(self):
         super().__init__()
-        # self.model = BaseEnformer.from_hparams(
-        #                                             dim = 1536,
-        #                                             depth = 11,
-        #                                             heads = 8,
-        #                                             output_heads = dict(flu = 3),
-        #                                             target_length = 2,
-        #                                         )
         self.model = BaseEnformer.from_pretrained('EleutherAI/enformer-official-rough', target_length=-1)
         # # freeze the model
         # for param in self.model.parameters():
         #     param.requires_grad = False
+        self.embed_dims = self.model.dim*2
+        self.attention_pool = nn.Linear(self.embed_dims, 1)
+
+    def forward(self, seq):
+        outs = self.model(seq, return_only_embeddings=True)
+        attn_weights = self.attention_pool(outs).squeeze(2)
+        attn_weights = F.softmax(attn_weights, dim=1)
+        outs = einsum('b n d, b n -> b d', outs, attn_weights)
+        return outs
+    
+class EnformerRandomInit(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = BaseEnformer.from_hparams(
+                                                    dim = 1536,
+                                                    depth = 11,
+                                                    heads = 8,
+                                                    output_heads = dict(flu = 3),
+                                                    target_length = -1,
+                                              )
         self.embed_dims = self.model.dim*2
         self.attention_pool = nn.Linear(self.embed_dims, 1)
 

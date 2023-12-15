@@ -103,8 +103,11 @@ def train_model(args, config, finetune=False):
         elif args.model_name == "LegNetLarge":
             model_class = backbone_modules.LegNetLarge
             pretrained_model_name = "LegNetLarge_" + pretrained_model_name
+        elif args.model_name == "EnformerRandomInit":
+            model_class = backbone_modules.EnformerRandomInit
+            pretrained_model_name = "EnformerRandomInit_" + pretrained_model_name        
         else:
-            raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+            raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet', 'LegNetLarge', or 'EnformerRandomInit'")
         pretrain_metric_direction_which_is_optimal = args.pretrain_metric_direction_which_is_optimal
         pretrained_model_save_dir = os.path.join(model_save_dir, pretrained_model_name, "default", "checkpoints")
 
@@ -205,8 +208,11 @@ def train_model(args, config, finetune=False):
     elif args.model_name == "LegNetLarge":
         model_class = backbone_modules.LegNetLarge
         name_format = "LegNetLarge_" + name_format
+    elif args.model_name == "EnformerRandomInit":
+        model_class = backbone_modules.EnformerRandomInit
+        name_format = "EnformerRandomInit_" + name_format
     else:
-        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet', 'LegNetLarge', or 'EnformerRandomInit'")
     
     # instantiate dataloaders
     dataloaders = {}
@@ -854,7 +860,7 @@ def train_model(args, config, finetune=False):
 
 args = argparse.ArgumentParser()
 args.add_argument("--config_path", type=str, default="./config.json", help="Path to config file")
-args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet', 'LegNetLarge', or 'EnformerRandomInit'")
 args.add_argument("--modelling_strategy", type=str, required=True, help="Modelling strategy to use, either 'joint', 'pretrain+finetune', 'pretrain+linear_probing' or 'single_task'")
 
 args.add_argument("--joint_tasks", type=str, default=None, help="Comma separated list of tasks to jointly train on")
