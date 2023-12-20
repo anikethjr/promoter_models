@@ -839,7 +839,7 @@ args.add_argument("--pretrain_metric_to_monitor", type=str, default="overall_val
 args.add_argument("--pretrain_metric_direction_which_is_optimal", type=str, default="min", help="Should pretrain metric be maximised (specify 'max') or minimised (specify 'min')?")
 
 args.add_argument("--patience", type=int, default=5, help="Patience for early stopping")
-args.add_argument("--save_top_k", type=int, default=3, help="Number of top models to save")
+args.add_argument("--save_top_k", type=int, default=1, help="Number of top models to save")
 
 args.add_argument("--fasta_shuffle_letters_path", type=str, default="fasta_shuffle_letters", help="Full path to the fasta_shuffle_letters executable")
 
