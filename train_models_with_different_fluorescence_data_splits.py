@@ -18,7 +18,7 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks import ModelCheckpoint
 
 from promoter_modelling.dataloaders import FluorescenceData, FluorescenceData_classification, FluorescenceData_with_motifs, FluorescenceData_DNABERT, \
-                                           LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, STARRSeq, Malinois_MPRA
+                                           LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, STARRSeq, Malinois_MPRA, lentiMPRA
 from promoter_modelling import backbone_modules
 from promoter_modelling import MTL_modules
 
@@ -193,6 +193,10 @@ def train_model(args, config, finetune=False):
                 elif t == "Sharpr_MPRA":
                     dataloaders[task].append(Sharpr_MPRA.SharprMPRADataLoader(batch_size=batch_size, \
                                                                                 data_dir=os.path.join(root_data_dir, "Sharpr_MPRA")))
+                elif t == "lentiMPRA":
+                    dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
+                                                                            data_dir=os.path.join(root_data_dir, "lentiMPRA", \
+                                                                            common_cache_dir=common_cache_dir)))
                 elif t == "STARRSeq":
                     dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
@@ -267,6 +271,10 @@ def train_model(args, config, finetune=False):
         elif task == "Sharpr_MPRA":
             dataloaders[task] = Sharpr_MPRA.SharprMPRADataLoader(batch_size=batch_size, \
                                                                     data_dir=os.path.join(root_data_dir, "Sharpr_MPRA"))
+        elif task == "lentiMPRA":
+            dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
+                                                                data_dir=os.path.join(root_data_dir, "lentiMPRA"), \
+                                                                common_cache_dir=common_cache_dir)
         elif task == "SuRE_classification":
             dataloaders[task] = []
             for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
