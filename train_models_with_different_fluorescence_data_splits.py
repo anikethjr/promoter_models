@@ -195,7 +195,7 @@ def train_model(args, config, finetune=False):
                                                                                 data_dir=os.path.join(root_data_dir, "Sharpr_MPRA")))
                 elif t == "lentiMPRA":
                     dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
-                                                                            data_dir=os.path.join(root_data_dir, "lentiMPRA", \
+                                                                            cache_dir=os.path.join(root_data_dir, "lentiMPRA", \
                                                                             common_cache_dir=common_cache_dir)))
                 elif t == "STARRSeq":
                     dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
@@ -273,7 +273,7 @@ def train_model(args, config, finetune=False):
                                                                     data_dir=os.path.join(root_data_dir, "Sharpr_MPRA"))
         elif task == "lentiMPRA":
             dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
-                                                                data_dir=os.path.join(root_data_dir, "lentiMPRA"), \
+                                                                cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
                                                                 common_cache_dir=common_cache_dir)
         elif task == "SuRE_classification":
             dataloaders[task] = []
