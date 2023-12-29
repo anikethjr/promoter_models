@@ -656,7 +656,7 @@ def train_model(args, config, finetune=False):
                     all_seeds_highly_expressed_f1[output].append(f1_highly_expressed)
 
                     all_seeds_lowly_expressed_accuracy[output].append(acc_lowly_expressed)
-            elif "Fluorescence" in dl:
+            elif (("Fluorescence" in dl) or ("Malinois_MPRA" in dl)) and (("joint_" in name_format) or ("finetune_" in name_format) or ("linear_probing_" in name_format) or ("individual_" in name_format)):
                 print()
                 for j, output in enumerate(all_dataloaders[i].output_names):
                     cur_y = dataloader_to_y[dl][:, j]
