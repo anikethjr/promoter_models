@@ -527,6 +527,13 @@ def train_model(args, config, finetune=False):
                     cur_y = dataloader_to_y[dl][:, j]
                     cur_pred = dataloader_to_pred[dl][:, j]
 
+                    # remove invalid values
+                    if "MalinoisMPRA" in dl:
+                        mask = cur_y != -100000
+                        cur_y = cur_y[mask]
+                        cur_pred = cur_pred[mask]
+                        print(f"Cell {output} has {len(cur_y)} valid values")
+
                     # get overall metrics
                     r2 = r2_score(cur_y, cur_pred)
                     pearsonr = stats.pearsonr(cur_y, cur_pred)[0]
