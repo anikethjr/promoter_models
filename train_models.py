@@ -157,8 +157,8 @@ def train_model(args, config, finetune=False):
         name_format = f"{args.model_name}_" + name_format
 
     # add optional name suffix to model name
-    if args.model_name_suffix is not None:
-        name_format += "_" + args.model_name_suffix
+    if args.optional_name_suffix is not None:
+        name_format += "_" + args.optional_name_suffix
 
     # instantiate dataloaders
     dataloaders = {}
