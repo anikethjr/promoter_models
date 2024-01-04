@@ -365,9 +365,21 @@ def train_model(args, config, finetune=False):
         else:
             name = name_format
 
-        mtlpredictor = MTL_modules.MTLPredictor(model_class=model_class,\
+        if args.model_name.startswith("MotifBased"):
+            mtlpredictor = MTL_modules.MTLPredictor(model_class=model_class,\
                                                 all_dataloader_modules=all_dataloaders, \
                                                 batch_size=batch_size, \
+                                                max_epochs=args.max_epochs, \
+                                                lr=lr, \
+                                                weight_decay=weight_decay, \
+                                                with_motifs=True, \
+                                                use_preconstructed_dataloaders=True, \
+                                                train_mode=train_mode)
+        else:                                                
+            mtlpredictor = MTL_modules.MTLPredictor(model_class=model_class,\
+                                                all_dataloader_modules=all_dataloaders, \
+                                                batch_size=batch_size, \
+                                                max_epochs=args.max_epochs, \
                                                 lr=lr, \
                                                 weight_decay=weight_decay, \
                                                 use_preconstructed_dataloaders=True, \
