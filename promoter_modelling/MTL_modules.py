@@ -182,7 +182,10 @@ class MTLPredictor(L.LightningModule):
             loss = 0.0
 
             if self.with_motifs:
-                X, motifs, y = dl_batch
+                if self.all_dataloader_modules[i].with_mask:
+                    X, motifs, y, mask = dl_batch
+                else:
+                    X, motifs, y = dl_batch
                 y_hat, l_funcs, l_weights = self([X, motifs])
             elif self.all_dataloader_modules[i].with_mask:
                 X, y, mask = dl_batch
@@ -219,7 +222,10 @@ class MTLPredictor(L.LightningModule):
     
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if self.with_motifs:
-            X, motifs, y = batch
+            if self.all_dataloader_modules[dataloader_idx].with_mask:
+                X, motifs, y, mask = batch
+            else:
+                X, motifs, y = batch
         elif self.all_dataloader_modules[dataloader_idx].with_mask:
             X, y, mask = batch
         else:
@@ -306,7 +312,10 @@ class MTLPredictor(L.LightningModule):
     
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         if self.with_motifs:
-            X, motifs, y = batch
+            if self.all_dataloader_modules[dataloader_idx].with_mask:
+                X, motifs, y, mask = batch
+            else:
+                X, motifs, y = batch
         elif self.all_dataloader_modules[dataloader_idx].with_mask:
             X, y, mask = batch
         else:
@@ -393,7 +402,10 @@ class MTLPredictor(L.LightningModule):
     
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         if self.with_motifs:
-            X, motifs, y = batch
+            if self.all_dataloader_modules[dataloader_idx].with_mask:
+                X, motifs, y, mask = batch
+            else:
+                X, motifs, y = batch
         elif self.all_dataloader_modules[dataloader_idx].with_mask:
             if len(batch) < 3: # happens when evaluating on a dataloader other than the training dataloader
                 X, y = batch
