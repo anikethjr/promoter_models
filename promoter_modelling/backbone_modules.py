@@ -45,15 +45,15 @@ def get_backbone_class(backbone_name):
         return EnformerRandomInit
     elif backbone_name == "MPRAnn":
         return MPRAnn
-    elif backbone_name == "LegNetOriginal":
-        return LegNetOriginal
     elif backbone_name == "LegNet":
         return LegNet
+    elif backbone_name == "LegNetLarge":
+        return LegNetLarge
     else:
         raise ValueError("Backbone name not recognized")
     
 def get_all_backbone_names():
-    return ["MTLucifer", "MTLuciferWithResidualBlocks", "PureCNN", "PureCNNLarge", "ResNet", "MotifBasedFCN", "MotifBasedFCNLarge", "DNABERT", "Enformer", "EnformerFrozenBase", "EnformerRandomInit", "MPRAnn", "LegNetOriginal", "LegNet"]
+    return ["MTLucifer", "MTLuciferWithResidualBlocks", "PureCNN", "PureCNNLarge", "ResNet", "MotifBasedFCN", "MotifBasedFCNLarge", "DNABERT", "Enformer", "EnformerFrozenBase", "EnformerRandomInit", "MPRAnn", "LegNet", "LegNetLarge"]
 
 
 class CNNBlock(nn.Module):

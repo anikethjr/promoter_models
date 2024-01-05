@@ -156,6 +156,10 @@ def train_model(args, config, finetune=False):
     if args.model_name != "MTLucifer":
         name_format = f"{args.model_name}_" + name_format
 
+    # add optional name suffix to model name
+    if args.optional_name_suffix is not None:
+        name_format += "_" + args.optional_name_suffix
+
     # instantiate dataloaders
     dataloaders = {}
     print("Instantiating dataloaders...")
@@ -371,9 +375,21 @@ def train_model(args, config, finetune=False):
         else:
             name = name_format
 
-        mtlpredictor = MTL_modules.MTLPredictor(model_class=model_class,\
+        if args.model_name.startswith("MotifBased"):
+            mtlpredictor = MTL_modules.MTLPredictor(model_class=model_class,\
                                                 all_dataloader_modules=all_dataloaders, \
                                                 batch_size=batch_size, \
+                                                max_epochs=args.max_epochs, \
+                                                lr=lr, \
+                                                weight_decay=weight_decay, \
+                                                with_motifs=True, \
+                                                use_preconstructed_dataloaders=True, \
+                                                train_mode=train_mode)
+        else:                                                
+            mtlpredictor = MTL_modules.MTLPredictor(model_class=model_class,\
+                                                all_dataloader_modules=all_dataloaders, \
+                                                batch_size=batch_size, \
+                                                max_epochs=args.max_epochs, \
                                                 lr=lr, \
                                                 weight_decay=weight_decay, \
                                                 use_preconstructed_dataloaders=True, \
@@ -531,11 +547,18 @@ def train_model(args, config, finetune=False):
                     print("{} Precision = {} ≈ {}".format(output, precision, np.around(precision, 4)))
                     print("{} Recall = {} ≈ {}".format(output, recall, np.around(recall, 4)))
                     print()
-            elif "Fluorescence" in dl:
+            elif (("Fluorescence" in dl) or ("MalinoisMPRA" in dl)) and (("joint_" in name_format) or ("finetune_" in name_format) or ("linear_probing_" in name_format) or ("individual_" in name_format)):
                 print()
                 for j, output in enumerate(all_dataloaders[i].output_names):
                     cur_y = dataloader_to_y[dl][:, j]
                     cur_pred = dataloader_to_pred[dl][:, j]
+
+                    # remove invalid values
+                    if "MalinoisMPRA" in dl:
+                        mask = cur_y != -100000
+                        cur_y = cur_y[mask]
+                        cur_pred = cur_pred[mask]
+                        print(f"Cell {output} has {len(cur_y)} valid values")
 
                     # get overall metrics
                     r2 = r2_score(cur_y, cur_pred)
@@ -842,6 +865,7 @@ args.add_argument("--pretrain_metric_direction_which_is_optimal", type=str, defa
 
 args.add_argument("--patience", type=int, default=5, help="Patience for early stopping")
 args.add_argument("--save_top_k", type=int, default=1, help="Number of top models to save")
+args.add_argument("--optional_name_suffix", type=str, default=None, help="Optional suffix to add to model name")
 
 args.add_argument("--fasta_shuffle_letters_path", type=str, default="fasta_shuffle_letters", help="Full path to the fasta_shuffle_letters executable")
 
