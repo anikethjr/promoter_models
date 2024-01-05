@@ -19,7 +19,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks import ModelCheckpoint
 
-from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, FluorescenceData_classification, lentiMPRA, STARRSeq, Malinois_MPRA
+from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, FluorescenceData_classification, lentiMPRA, STARRSeq, Malinois_MPRA, Malinois_MPRA_DNABERT
 from promoter_modelling import backbone_modules
 from promoter_modelling import MTL_modules
 
@@ -224,10 +224,6 @@ def train_model(args, config, finetune=False):
                     dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
                                                                             common_cache_dir=common_cache_dir))
-                elif t == "Malinois_MPRA":
-                    dataloaders[task].append(Malinois_MPRA.MalinoisMPRADataLoader(batch_size=batch_size, \
-                                                                                  cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
-                                                                                    common_cache_dir=common_cache_dir))
                 elif t == "FluorescenceData":
                     dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData")))
@@ -238,6 +234,15 @@ def train_model(args, config, finetune=False):
                 elif t == "FluorescenceData_classification":
                     dataloaders[task].append(FluorescenceData_classification.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification")))
+                elif t == "Malinois_MPRA":
+                    if "DNABERT" in args.model_name:
+                        dataloaders[task].append(Malinois_MPRA_DNABERT.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                            cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                            common_cache_dir=common_cache_dir))
+                    else:
+                        dataloaders[task].append(Malinois_MPRA.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                        common_cache_dir=common_cache_dir))
         elif task == "LL100":
             dataloaders[task] = LL100.LL100DataLoader(batch_size=batch_size, \
                                                         cache_dir=os.path.join(root_data_dir, "LL-100"), \
@@ -289,10 +294,6 @@ def train_model(args, config, finetune=False):
             dataloaders[task] = STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
                                                                 cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
                                                                 common_cache_dir=common_cache_dir)
-        elif task == "Malinois_MPRA":
-            dataloaders[task] = Malinois_MPRA.MalinoisMPRADataLoader(batch_size=batch_size, \
-                                                                      cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
-                                                                        common_cache_dir=common_cache_dir)
         elif task == "FluorescenceData":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"))
@@ -315,6 +316,15 @@ def train_model(args, config, finetune=False):
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
                                                                         return_specified_cells=[2])
+        elif task == "Malinois_MPRA":
+            if "DNABERT" in args.model_name:
+                dataloaders[task] = Malinois_MPRA_DNABERT.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                    cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                    common_cache_dir=common_cache_dir)
+            else:
+                dataloaders[task] = Malinois_MPRA.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                common_cache_dir=common_cache_dir)
     
     all_dataloaders = []
     for task in tasks:
