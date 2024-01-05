@@ -69,7 +69,7 @@ def train_model(args, config, finetune=False):
 
     if args.model_name.startswith("MotifBased"):
         assert len(tasks) == 1, "Motif-based models can only be trained on a single task"
-        assert tasks[0] == "FluorescenceData" or tasks[0] == "FluorescenceData_DE", "Motif-based models can only be trained on FluorescenceData or FluorescenceData_DE"
+        assert tasks[0] == "FluorescenceData" or tasks[0] == "FluorescenceData_DE" or tasks[0] == "Malinois_MPRA", "Motif-based models can only be trained on FluorescenceData or FluorescenceData_DE"
 
     # load pretrained model state dict if necessary
     if "pretrain" in args.modelling_strategy and finetune:
