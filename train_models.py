@@ -19,7 +19,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks import ModelCheckpoint
 
-from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, FluorescenceData_classification, lentiMPRA, STARRSeq, Malinois_MPRA, Malinois_MPRA_DNABERT
+from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, FluorescenceData_classification, lentiMPRA, STARRSeq, Malinois_MPRA, Malinois_MPRA_DNABERT, Malinois_MPRA_with_motifs
 from promoter_modelling import backbone_modules
 from promoter_modelling import MTL_modules
 
@@ -239,7 +239,11 @@ def train_model(args, config, finetune=False):
                     dataloaders[task].append(FluorescenceData_classification.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification")))
                 elif t == "Malinois_MPRA":
-                    if "DNABERT" in args.model_name:
+                    if args.model_name.startswith("MotifBased"):
+                        dataloaders[task].append(Malinois_MPRA_with_motifs.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                            cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                            common_cache_dir=common_cache_dir))
+                    elif "DNABERT" in args.model_name:
                         dataloaders[task].append(Malinois_MPRA_DNABERT.MalinoisMPRADataLoader(batch_size=batch_size, \
                                                                                             cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
                                                                                             common_cache_dir=common_cache_dir))
@@ -321,7 +325,11 @@ def train_model(args, config, finetune=False):
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
                                                                         return_specified_cells=[2])
         elif task == "Malinois_MPRA":
-            if "DNABERT" in args.model_name:
+            if args.model_name.startswith("MotifBased"):
+                dataloaders[task] = Malinois_MPRA_with_motifs.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                    cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                    common_cache_dir=common_cache_dir)
+            elif "DNABERT" in args.model_name:
                 dataloaders[task] = Malinois_MPRA_DNABERT.MalinoisMPRADataLoader(batch_size=batch_size, \
                                                                                     cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
                                                                                     common_cache_dir=common_cache_dir)
