@@ -111,9 +111,9 @@ def generate_cmds_for_motif_detection(sequences, \
     
     cmds = []
     if both_strands:
-        cmds.append("{} --max-stored-scores 1000000 --verbosity 1 --oc {} {} {}".format(fimo_cmd_path, output_dir, motifs_path, temp_file_name))
+        cmds.append("{} --verbosity 1 --oc {} {} {}".format(fimo_cmd_path, output_dir, motifs_path, temp_file_name))
     else:
-        cmds.append("{} --max-stored-scores 1000000 --verbosity 1 --oc {} --norc {} {}".format(fimo_cmd_path, output_dir, motifs_path, temp_file_name))
+        cmds.append("{} --verbosity 1 --oc {} --norc {} {}".format(fimo_cmd_path, output_dir, motifs_path, temp_file_name))
         
     return cmds
 
