@@ -22,12 +22,12 @@ torch.manual_seed(97)
 
 def determine_cell_specific_class(row):
     if row["class"] == "ClassIII":
-        return "ClassIII_" + row["final_provenance_x"].split(" ~ ")[1][len("type="):]
+        return "ClassIII_" + row["final_provenance"].split(" ~ ")[1][len("type="):]
     elif row["class"] == "ClassII":
-        return "ClassII_" + row["final_provenance_x"].split(" ~ ")[0][len("cell="):] + "_" + row["final_provenance_x"].split(" ~ ")[1][len("type="):] + "_" + row["final_provenance_x"].split(" ~ ")[2][len("total_num_motifs="):]
+        return "ClassII_" + row["final_provenance"].split(" ~ ")[0][len("cell="):] + "_" + row["final_provenance"].split(" ~ ")[1][len("type="):] + "_" + row["final_provenance"].split(" ~ ")[2][len("total_num_motifs="):]
     else:
-        log2FoldChange = float(row["final_provenance_x"].split(" ~ ")[2][len("log2FoldChange="):])
-        first_description = row["final_provenance_x"].split(" ~ ")[4][len("description="):].split(";")[0]
+        log2FoldChange = float(row["final_provenance"].split(" ~ ")[2][len("log2FoldChange="):])
+        first_description = row["final_provenance"].split(" ~ ")[4][len("description="):].split(";")[0]
         all_cells = ["NK92", "THP1", "JURKAT"]
         out = "ClassI"
         for c in all_cells:
