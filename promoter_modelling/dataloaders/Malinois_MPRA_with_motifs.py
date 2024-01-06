@@ -344,9 +344,9 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
             vierstra_motifs_occurrences = pd.read_csv(self.path_to_motif_occurrences_file, sep="\t")
 
         # add motif occurrences to final dataset
-        motif_cols = [i for i in df.columns if ":" in i]
+        motif_cols = [i for i in vierstra_motifs_occurrences.columns if ":" in i]
         # number of motifs for which we have occurrence counts
-        self.num_motifs = 762
+        self.num_motifs = 693
         assert len(motif_cols) == self.num_motifs
         for col in motif_cols:
             self.final_dataset[col] = vierstra_motifs_occurrences[col].values

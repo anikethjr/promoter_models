@@ -15,7 +15,7 @@ import lightning as L
 
 import torchmetrics
 
-from promoter_modelling.utils import fasta_utils
+from promoter_modelling.utils import fasta_utils, motif_detection_utils
 
 np.random.seed(97)
 torch.manual_seed(97)
@@ -99,12 +99,7 @@ class FluorescenceDataLoader(L.LightningDataModule):
         if not os.path.exists(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv")):
             os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1kTfsZvsCz7EWUhl-UZgK0B31LtxJH4qG' -O {}".format(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv")))
             assert os.path.exists(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv"))
-        # download motif occurrences file if not already downloaded
-        path_to_motif_occurrences_file = os.path.join(self.cache_dir, "motif_occurrences.tsv")
-        if not os.path.exists(path_to_motif_occurrences_file):
-            os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1AL431APt7AYG0fpgZlLCF9neUW1OTUYr' -O {}".format(path_to_motif_occurrences_file))
-            assert os.path.exists(path_to_motif_occurrences_file), "Failed to download motif occurrences file"      
-    
+        
     def update_metrics(self, y_hat, y, loss, split):
         self.all_metrics[split]["{}_avg_epoch_loss".format(self.name)].update(loss)
         for i, output in enumerate(self.output_names):
@@ -178,9 +173,6 @@ class FluorescenceDataLoader(L.LightningDataModule):
         self.cell_names = np.array(["JURKAT", "K562", "THP1"])
         self.num_outputs = self.num_cells
         self.output_names = self.cell_names
-        
-        # number of motifs for which we have occurrence counts
-        self.num_motifs = 762
                 
         self.cache_dir = cache_dir
         if not os.path.exists(self.cache_dir):
@@ -299,6 +291,26 @@ class FluorescenceDataLoader(L.LightningDataModule):
         
         self.merged = pd.read_csv(self.merged_cache_path, sep="\t")
         self.all_classes = sorted(list(set(self.merged["cell_specific_class"])))
+
+        # create motif occurrences file
+        self.path_to_motif_occurrences_file = os.path.join(self.cache_dir, "motif_occurrences.tsv")
+        if not os.path.exists(self.path_to_motif_occurrences_file):
+            vierstra_motifs_occurrences = motif_detection_utils.detect_vierstra_motifs_in_sequences(self.final_dataset["sequence"].values, 
+                                                                                                    "FluorescenceData_sequences", 
+                                                                                                    self.cache_dir, 
+                                                                                                    os.path.join(self.common_cache_dir, "vierstra_motifs"))
+            vierstra_motifs_occurrences.to_csv(self.path_to_motif_occurrences_file, sep="\t", index=False)
+        else:
+            print("Loading motif occurrences file from cache...")
+            vierstra_motifs_occurrences = pd.read_csv(self.path_to_motif_occurrences_file, sep="\t")
+
+        # add motif occurrences to final dataset
+        motif_cols = [i for i in vierstra_motifs_occurrences.columns if ":" in i]
+        # number of motifs for which we have occurrence counts
+        self.num_motifs = 693
+        assert len(motif_cols) == self.num_motifs
+        for col in motif_cols:
+            self.merged[col] = vierstra_motifs_occurrences[col].values
         
         self.train_set = self.merged[self.merged["is_train"]].reset_index(drop=True)
         self.test_set = self.merged[self.merged["is_test"]].reset_index(drop=True)
