@@ -234,7 +234,7 @@ class FluorescenceDataLoader(L.LightningDataModule):
                 for cell in self.cell_names:
                     self.measurements[cell] = stats.zscore(self.measurements[cell])
 
-            self.sequence_properties = pd.read_csv(os.path.join(self.cache_dir, "motif_occurrences.tsv"), sep="\t")
+            self.sequence_properties = pd.read_csv(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv"), sep="\t")
             self.sequence_properties["cell_specific_class"] = self.sequence_properties.apply(lambda x: determine_cell_specific_class(x), axis=1)
 
             self.merged = self.measurements.merge(self.sequence_properties, on="sequence", how="inner")
