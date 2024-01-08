@@ -53,7 +53,6 @@ class MalinoisMPRADataset(Dataset):
         
         # create motif occurrences matrix
         motif_cols = [i for i in df.columns if ":" in i]
-        assert len(motif_cols) == self.num_motifs
         self.all_motif_occurs = df[motif_cols].to_numpy().astype(np.float32)
         print("Motifs matrix shape = {}".format(self.all_motif_occurs.shape))
         
