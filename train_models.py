@@ -156,9 +156,13 @@ def train_model(args, config, finetune=False):
     if args.model_name != "MTLucifer":
         name_format = f"{args.model_name}_" + name_format
 
-    # add optional name suffix to model name
+    # add optional name suffix to model name - only when not pretraining
     if args.optional_name_suffix is not None:
-        name_format += "_" + args.optional_name_suffix
+        if "pretrain" in args.modelling_strategy:
+            if finetune:
+                name_format += "_" + args.optional_name_suffix
+        else:
+            name_format += "_" + args.optional_name_suffix
 
     # instantiate dataloaders
     dataloaders = {}
