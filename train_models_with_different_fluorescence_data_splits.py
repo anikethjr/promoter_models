@@ -12,13 +12,13 @@ from sklearn.metrics import r2_score, accuracy_score, precision_score, recall_sc
 
 import torch
 
-import lightning.pytorch as pl
+import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks import ModelCheckpoint
 
 from promoter_modelling.dataloaders import FluorescenceData, FluorescenceData_classification, FluorescenceData_with_motifs, FluorescenceData_DNABERT, \
-                                           LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, STARRSeq
+                                           LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, STARRSeq, Malinois_MPRA, Malinois_MPRA_DNABERT, Malinois_MPRA_with_motifs, lentiMPRA
 from promoter_modelling import backbone_modules
 from promoter_modelling import MTL_modules
 
@@ -69,7 +69,7 @@ def train_model(args, config, finetune=False):
 
     if args.model_name.startswith("MotifBased"):
         assert len(tasks) == 1, "Motif-based models can only be trained on a single task"
-        assert tasks[0] == "FluorescenceData" or tasks[0] == "FluorescenceData_DE", "Motif-based models can only be trained on FluorescenceData or FluorescenceData_DE"
+        assert tasks[0] == "FluorescenceData" or tasks[0] == "FluorescenceData_DE" or tasks[0] == "Malinois_MPRA", "Motif-based models can only be trained on FluorescenceData or FluorescenceData_DE"
 
     # load pretrained model state dict if necessary
     if "pretrain" in args.modelling_strategy and finetune:
@@ -77,34 +77,10 @@ def train_model(args, config, finetune=False):
 
         pretrained_model_name = "pretrain_on_{}".format("+".join(pretrain_tasks))
         # map to model classes
-        if args.model_name == "MTLucifer":
-            model_class = backbone_modules.MTLucifer
-        elif args.model_name == "PureCNN":
-            model_class = backbone_modules.PureCNN
-            pretrained_model_name = "PureCNN_" + pretrained_model_name
-        elif args.model_name == "PureCNNLarge":
-            model_class = backbone_modules.PureCNNLarge
-            pretrained_model_name = "PureCNNLarge_" + pretrained_model_name
-        elif args.model_name == "MotifBasedFCN":
-            model_class = backbone_modules.MotifBasedFCN
-            pretrained_model_name = "MotifBasedFCN_" + pretrained_model_name
-        elif args.model_name == "MotifBasedFCNLarge":
-            model_class = backbone_modules.MotifBasedFCNLarge
-            pretrained_model_name = "MotifBasedFCNLarge_" + pretrained_model_name
-        elif args.model_name == "MPRAnn":
-            model_class = backbone_modules.MPRAnn
-            pretrained_model_name = "MPRAnn_" + pretrained_model_name
-        elif args.model_name == "DNABERT":
-            model_class = backbone_modules.DNABERT
-            pretrained_model_name = "DNABERT_" + pretrained_model_name
-        elif args.model_name == "LegNet":
-            model_class = backbone_modules.LegNet
-            pretrained_model_name = "LegNet_" + pretrained_model_name
-        elif args.model_name == "LegNetLarge":
-            model_class = backbone_modules.LegNetLarge
-            pretrained_model_name = "LegNetLarge_" + pretrained_model_name
-        else:
-            raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+        model_class = backbone_modules.get_backbone_class(args.model_name)
+        if args.model_name != "MTLucifer":
+            pretrained_model_name = f"{args.model_name}_" + pretrained_model_name
+
         pretrain_metric_direction_which_is_optimal = args.pretrain_metric_direction_which_is_optimal
         pretrained_model_save_dir = os.path.join(model_save_dir, pretrained_model_name, "default", "checkpoints")
 
@@ -179,34 +155,17 @@ def train_model(args, config, finetune=False):
         name_format = "individual_training_on_{}".format("+".join(tasks))
     
     # map to model classes
-    if args.model_name == "MTLucifer":
-        model_class = backbone_modules.MTLucifer
-    elif args.model_name == "PureCNN":
-        model_class = backbone_modules.PureCNN
-        name_format = "PureCNN_" + name_format
-    elif args.model_name == "PureCNNLarge":
-        model_class = backbone_modules.PureCNNLarge
-        name_format = "PureCNNLarge_" + name_format
-    elif args.model_name == "MotifBasedFCN":
-        model_class = backbone_modules.MotifBasedFCN
-        name_format = "MotifBasedFCN_" + name_format
-    elif args.model_name == "MotifBasedFCNLarge":
-        model_class = backbone_modules.MotifBasedFCNLarge
-        name_format = "MotifBasedFCNLarge_" + name_format
-    elif args.model_name == "MPRAnn":
-        model_class = backbone_modules.MPRAnn
-        name_format = "MPRAnn_" + name_format
-    elif args.model_name == "DNABERT":
-        model_class = backbone_modules.DNABERT
-        name_format = "DNABERT_" + name_format
-    elif args.model_name == "LegNet":
-        model_class = backbone_modules.LegNet
-        name_format = "LegNet_" + name_format
-    elif args.model_name == "LegNetLarge":
-        model_class = backbone_modules.LegNetLarge
-        name_format = "LegNetLarge_" + name_format
-    else:
-        raise Exception("Invalid model_name specified, must be 'MTLucifer', 'PureCNN', 'PureCNNLarge', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'MPRAnn', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+    model_class = backbone_modules.get_backbone_class(args.model_name)
+    if args.model_name != "MTLucifer":
+        name_format = f"{args.model_name}_" + name_format
+
+    # add optional name suffix to model name - only when not pretraining
+    if args.optional_name_suffix is not None:
+        if "pretrain" in args.modelling_strategy:
+            if finetune:
+                name_format += "_" + args.optional_name_suffix
+        else:
+            name_format += "_" + args.optional_name_suffix
     
     # instantiate dataloaders
     dataloaders = {}
@@ -242,6 +201,10 @@ def train_model(args, config, finetune=False):
                 elif t == "Sharpr_MPRA":
                     dataloaders[task].append(Sharpr_MPRA.SharprMPRADataLoader(batch_size=batch_size, \
                                                                                 data_dir=os.path.join(root_data_dir, "Sharpr_MPRA")))
+                elif t == "lentiMPRA":
+                    dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "lentiMPRA", \
+                                                                            common_cache_dir=common_cache_dir)))
                 elif t == "STARRSeq":
                     dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
@@ -297,6 +260,19 @@ def train_model(args, config, finetune=False):
                 elif t == "FluorescenceData_classification":
                     dataloaders[task].append(FluorescenceData_classification.FluorescenceDataLoader(batch_size=batch_size, \
                                                                                                     cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification")))
+                elif t == "Malinois_MPRA":
+                    if args.model_name.startswith("MotifBased"):
+                        dataloaders[task].append(Malinois_MPRA_with_motifs.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                            cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                            common_cache_dir=common_cache_dir))
+                    elif "DNABERT" in args.model_name:
+                        dataloaders[task].append(Malinois_MPRA_DNABERT.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                            cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                            common_cache_dir=common_cache_dir))
+                    else:
+                        dataloaders[task].append(Malinois_MPRA.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                        common_cache_dir=common_cache_dir))
         elif task == "LL100":
             dataloaders[task] = LL100.LL100DataLoader(batch_size=batch_size, \
                                                         cache_dir=os.path.join(root_data_dir, "LL-100"), \
@@ -316,6 +292,10 @@ def train_model(args, config, finetune=False):
         elif task == "Sharpr_MPRA":
             dataloaders[task] = Sharpr_MPRA.SharprMPRADataLoader(batch_size=batch_size, \
                                                                     data_dir=os.path.join(root_data_dir, "Sharpr_MPRA"))
+        elif task == "lentiMPRA":
+            dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
+                                                                cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
+                                                                common_cache_dir=common_cache_dir)
         elif task == "SuRE_classification":
             dataloaders[task] = []
             for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
@@ -381,6 +361,19 @@ def train_model(args, config, finetune=False):
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
                                                                         return_specified_cells=2)
+        elif task == "Malinois_MPRA":
+            if args.model_name.startswith("MotifBased"):
+                dataloaders[task] = Malinois_MPRA_with_motifs.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                    cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                    common_cache_dir=common_cache_dir)
+            elif "DNABERT" in args.model_name:
+                dataloaders[task] = Malinois_MPRA_DNABERT.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                    cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                    common_cache_dir=common_cache_dir)
+            else:
+                dataloaders[task] = Malinois_MPRA.MalinoisMPRADataLoader(batch_size=batch_size, \
+                                                                                cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
+                                                                                common_cache_dir=common_cache_dir)
     
     all_dataloaders = []
     for task in tasks:
@@ -539,7 +532,7 @@ def train_model(args, config, finetune=False):
             print("Loaded existing model")
             
             # get test set predictions
-            trainer = pl.Trainer(accelerator="gpu", devices=1)
+            trainer = L.Trainer(accelerator="gpu", devices=1)
             best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader())
 
         else:
@@ -579,7 +572,7 @@ def train_model(args, config, finetune=False):
             early_stop_callback = EarlyStopping(monitor=metric_to_monitor, min_delta=0.00, \
                                                 patience=patience, verbose=True, mode=metric_direction_which_is_optimal)
 
-            trainer = pl.Trainer(logger=wandb_logger, \
+            trainer = L.Trainer(logger=wandb_logger, \
                                 callbacks=[early_stop_callback, checkpoint_callback], \
                                 deterministic=True, accelerator="gpu", devices=1, \
                                 log_every_n_steps=10, default_root_dir=model_save_dir, \
@@ -697,11 +690,18 @@ def train_model(args, config, finetune=False):
                     all_seeds_highly_expressed_f1[output].append(f1_highly_expressed)
 
                     all_seeds_lowly_expressed_accuracy[output].append(acc_lowly_expressed)
-            elif "Fluorescence" in dl:
+            elif (("Fluorescence" in dl) or ("MalinoisMPRA" in dl)) and (("joint_" in name_format) or ("finetune_" in name_format) or ("linear_probing_" in name_format) or ("individual_" in name_format)):
                 print()
                 for j, output in enumerate(all_dataloaders[i].output_names):
                     cur_y = dataloader_to_y[dl][:, j]
                     cur_pred = dataloader_to_pred[dl][:, j]
+
+                    # remove invalid values
+                    if "MalinoisMPRA" in dl:
+                        mask = cur_y != -100000
+                        cur_y = cur_y[mask]
+                        cur_pred = cur_pred[mask]
+                        print(f"Cell {output} has {len(cur_y)} valid values")
 
                     r2 = r2_score(cur_y, cur_pred)
                     pearsonr = stats.pearsonr(cur_y, cur_pred)[0]
@@ -854,7 +854,7 @@ def train_model(args, config, finetune=False):
 
 args = argparse.ArgumentParser()
 args.add_argument("--config_path", type=str, default="./config.json", help="Path to config file")
-args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, either 'MTLucifer', 'MTLuciferGranular', 'PureCNN', 'PureCNNLarge', 'ResNet', 'MotifBasedFCN', 'MotifBasedFCNLarge', 'DNABERT', 'LegNet' or 'LegNetLarge'")
+args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, must be one of {}".format(backbone_modules.get_all_backbone_names()))
 args.add_argument("--modelling_strategy", type=str, required=True, help="Modelling strategy to use, either 'joint', 'pretrain+finetune', 'pretrain+linear_probing' or 'single_task'")
 
 args.add_argument("--joint_tasks", type=str, default=None, help="Comma separated list of tasks to jointly train on")
@@ -888,7 +888,8 @@ args.add_argument("--pretrain_metric_to_monitor", type=str, default="overall_val
 args.add_argument("--pretrain_metric_direction_which_is_optimal", type=str, default="min", help="Should pretrain metric be maximised (specify 'max') or minimised (specify 'min')?")
 
 args.add_argument("--patience", type=int, default=5, help="Patience for early stopping")
-args.add_argument("--save_top_k", type=int, default=3, help="Number of top models to save")
+args.add_argument("--save_top_k", type=int, default=1, help="Number of top models to save")
+args.add_argument("--optional_name_suffix", type=str, default=None, help="Optional suffix to add to model name")
 
 args.add_argument("--fasta_shuffle_letters_path", type=str, default="fasta_shuffle_letters", help="Full path to the fasta_shuffle_letters executable")
 

@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
-import lightning.pytorch as pl
+import lightning as L
 
 import torchmetrics
 
@@ -364,12 +364,11 @@ def subsample_sequences_based_on_GC_content(all_files, \
 
 # class to create batches for SuRE data
 class SuREDataset(Dataset):
-    def __init__(self, path_to_x, split_name, num_outputs, num_classes_per_output, output_names, task, shrink_set=False):
+    def __init__(self, path_to_x, split_name, num_outputs, output_names, task, shrink_set=False):
         super().__init__()
 
         self.split_name = split_name
         self.num_outputs = num_outputs
-        self.num_classes_per_output = num_classes_per_output
         self.output_names = output_names
         self.x = pd.read_csv(path_to_x, sep="\t")        
         self.num_windows = 1
@@ -417,7 +416,7 @@ def pad_collate(batch):
 # and there are multiple data columns with read counts (depending on how many replicates were used) - 
 # SuRE*_*HEPG2* are for HepG2
 # other SuRE*_* columns are for K562
-class SuREDataLoader(pl.LightningDataModule):
+class SuREDataLoader(L.LightningDataModule):
     def download_data(self):
         download_path = None
         if self.genome_id == "SuRE42_HG02601":
@@ -665,13 +664,13 @@ class SuREDataLoader(pl.LightningDataModule):
 #         print("Final size of test set = {}".format(self.test_set.shape))
         
         print("Creating train dataset")
-        self.train_dataset = SuREDataset(self.train_set, "train", self.num_outputs, self.num_classes_per_output, self.output_names, self.task)
+        self.train_dataset = SuREDataset(self.train_set, "train", self.num_outputs, self.output_names, self.task)
         
         print("Creating test dataset")
-        self.test_dataset = SuREDataset(self.test_set, "test", self.num_outputs, self.num_classes_per_output, self.output_names, self.task, shrink_set=shrink_test_set)
+        self.test_dataset = SuREDataset(self.test_set, "test", self.num_outputs, self.output_names, self.task, shrink_set=shrink_test_set)
         
         print("Creating val dataset")
-        self.val_dataset = SuREDataset(self.val_set, "val", self.num_outputs, self.num_classes_per_output, self.output_names, self.task, shrink_set=shrink_test_set)
+        self.val_dataset = SuREDataset(self.val_set, "val", self.num_outputs, self.output_names, self.task, shrink_set=shrink_test_set)
         
         self.num_train = len(self.train_dataset)
         self.num_val = len(self.val_dataset)

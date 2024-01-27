@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import lightning.pytorch as pl
+import lightning as L
 from lightning.pytorch.utilities.combined_loader import CombinedLoader
 
 import torchmtl
@@ -17,7 +17,7 @@ np.random.seed(97)
 torch.manual_seed(97)
 
 # combines multiple dataloaders into one
-class MTLDataLoader(pl.LightningDataModule):
+class MTLDataLoader(L.LightningDataModule):
     # change min_size to max_size_cycle to iterate through largest dataset fully during each training epoch
     # more details: https://github.com/Lightning-AI/lightning/blob/15ef52bc732d1f907de4de58683f131652c0d68c/src/pytorch_lightning/trainer/supporters.py
     def __init__(self, all_dataloaders, train_mode="min_size", return_full_dataset_for_predict=False):
@@ -76,7 +76,7 @@ batch_size: batch size to be used for training
 '''
 
 # maybe make loss_fn and task_type attributes of individual dataloaders?
-class MTLPredictor(pl.LightningModule):
+class MTLPredictor(L.LightningModule):
     def __init__(self, \
                  model_class, \
                  all_dataloader_modules, \
@@ -135,14 +135,14 @@ class MTLPredictor(pl.LightningModule):
                                         'loss_weight': torch.tensor(1.0),
                                         'anchor_layer': 'Backbone'
                                     })
-            elif task.name.startswith("FluorescenceData"): # only when predicting fluorescence data use MTLFinalPredictor
-                model_config.append({
-                                        'name': task.name,
-                                        'layers': MTLFinalPredictor(self.backbone.embed_dims, task.num_outputs),
-                                        'loss': task.loss_fn,
-                                        'loss_weight': torch.tensor(0.0),
-                                        'anchor_layer': 'Backbone'
-                                    })
+            # elif task.name.startswith("FluorescenceData"): # only when predicting fluorescence data use MTLFinalPredictor
+            #     model_config.append({
+            #                             'name': task.name,
+            #                             'layers': MTLFinalPredictor(self.backbone.embed_dims, task.num_outputs),
+            #                             'loss': task.loss_fn,
+            #                             'loss_weight': torch.tensor(0.0),
+            #                             'anchor_layer': 'Backbone'
+            #                         })
             else:
                 model_config.append({
                                         'name': task.name,
@@ -182,7 +182,10 @@ class MTLPredictor(pl.LightningModule):
             loss = 0.0
 
             if self.with_motifs:
-                X, motifs, y = dl_batch
+                if self.all_dataloader_modules[i].with_mask:
+                    X, motifs, y, mask = dl_batch
+                else:
+                    X, motifs, y = dl_batch
                 y_hat, l_funcs, l_weights = self([X, motifs])
             elif self.all_dataloader_modules[i].with_mask:
                 X, y, mask = dl_batch
@@ -219,7 +222,10 @@ class MTLPredictor(pl.LightningModule):
     
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if self.with_motifs:
-            X, motifs, y = batch
+            if self.all_dataloader_modules[dataloader_idx].with_mask:
+                X, motifs, y, mask = batch
+            else:
+                X, motifs, y = batch
         elif self.all_dataloader_modules[dataloader_idx].with_mask:
             X, y, mask = batch
         else:
@@ -306,7 +312,10 @@ class MTLPredictor(pl.LightningModule):
     
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         if self.with_motifs:
-            X, motifs, y = batch
+            if self.all_dataloader_modules[dataloader_idx].with_mask:
+                X, motifs, y, mask = batch
+            else:
+                X, motifs, y = batch
         elif self.all_dataloader_modules[dataloader_idx].with_mask:
             X, y, mask = batch
         else:
@@ -393,7 +402,10 @@ class MTLPredictor(pl.LightningModule):
     
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         if self.with_motifs:
-            X, motifs, y = batch
+            if self.all_dataloader_modules[dataloader_idx].with_mask:
+                X, motifs, y, mask = batch
+            else:
+                X, motifs, y = batch
         elif self.all_dataloader_modules[dataloader_idx].with_mask:
             if len(batch) < 3: # happens when evaluating on a dataloader other than the training dataloader
                 X, y = batch

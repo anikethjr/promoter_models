@@ -19,7 +19,7 @@ import lightning as L
 
 import torchmetrics
 
-from promoter_modelling.utils import fasta_utils
+from promoter_modelling.utils import fasta_utils, motif_detection_utils
 
 np.random.seed(97)
 torch.manual_seed(97)
@@ -50,6 +50,11 @@ class MalinoisMPRADataset(Dataset):
             self.all_seqs = np.array(self.all_seqs)
             np.save(os.path.join(self.cache_dir, f"{split}_seqs.npy"), self.all_seqs)
             print("Done! Shape = {}".format(self.all_seqs.shape))
+        
+        # create motif occurrences matrix
+        motif_cols = [i for i in df.columns if ":" in i]
+        self.all_motif_occurs = df[motif_cols].to_numpy().astype(np.float32)
+        print("Motifs matrix shape = {}".format(self.all_motif_occurs.shape))
         
         # create outputs
         self.all_outputs = {}
@@ -83,7 +88,7 @@ class MalinoisMPRADataset(Dataset):
         return len(self.df)
     
     def __getitem__(self, idx):
-        return self.all_seqs[idx], self.all_outputs[idx], self.valid_outputs_mask[idx]
+        return self.all_seqs[idx], self.all_motif_occurs[idx], self.all_outputs[idx], self.valid_outputs_mask[idx]
 
 
 class MalinoisMPRADataLoader(L.LightningDataModule):
@@ -221,6 +226,7 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
         self.promoter_windows_relative_to_TSS = [] # dummy
 
         self.cache_dir = cache_dir
+        self.common_cache_dir = common_cache_dir
         self.download_data()
 
         self.cell_names = ["K562", "HepG2", "GM12878", "SK-N-SH", "A549"]
@@ -323,6 +329,26 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
             print("Loading final dataset from cache...")
 
         self.final_dataset = pd.read_csv(self.final_dataset_path, sep="\t")
+
+        # create motif occurrences file
+        self.path_to_motif_occurrences_file = os.path.join(self.cache_dir, "motif_occurrences.tsv")
+        if not os.path.exists(self.path_to_motif_occurrences_file):
+            vierstra_motifs_occurrences = motif_detection_utils.detect_vierstra_motifs_in_sequences(self.final_dataset["sequence"].values, 
+                                                                                                    "Malinois_MPRA_sequences", 
+                                                                                                    self.cache_dir, 
+                                                                                                    os.path.join(self.common_cache_dir, "vierstra_motifs"))
+            vierstra_motifs_occurrences.to_csv(self.path_to_motif_occurrences_file, sep="\t", index=False)
+        else:
+            print("Loading motif occurrences file from cache...")
+            vierstra_motifs_occurrences = pd.read_csv(self.path_to_motif_occurrences_file, sep="\t")
+
+        # add motif occurrences to final dataset
+        motif_cols = [i for i in vierstra_motifs_occurrences.columns if ":" in i]
+        # number of motifs for which we have occurrence counts
+        self.num_motifs = 693
+        assert len(motif_cols) == self.num_motifs
+        for col in motif_cols:
+            self.final_dataset[col] = vierstra_motifs_occurrences[col].values
 
         self.train_set = self.final_dataset[self.final_dataset["is_train"]].reset_index(drop=True)
         self.test_set = self.final_dataset[self.final_dataset["is_test"]].reset_index(drop=True)

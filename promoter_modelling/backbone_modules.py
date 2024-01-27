@@ -20,6 +20,42 @@ from tltorch import TRL
 np.random.seed(97)
 torch.manual_seed(97)
 
+def get_backbone_class(backbone_name):
+    if backbone_name == "MTLucifer":
+        return MTLucifer
+    elif backbone_name == "MTLuciferWithResidualBlocks":
+        return MTLuciferWithResidualBlocks
+    elif backbone_name == "PureCNN":
+        return PureCNN
+    elif backbone_name == "PureCNNLarge":
+        return PureCNNLarge
+    elif backbone_name == "ResNet":
+        return ResNet
+    elif backbone_name == "MotifBasedFCN":
+        return MotifBasedFCN
+    elif backbone_name == "MotifBasedFCNLarge":
+        return MotifBasedFCNLarge
+    elif backbone_name == "DNABERT":
+        return DNABERT
+    elif backbone_name == "Enformer":
+        return Enformer
+    elif backbone_name == "EnformerFrozenBase":
+        return EnformerFrozenBase
+    elif backbone_name == "EnformerRandomInit":
+        return EnformerRandomInit
+    elif backbone_name == "MPRAnn":
+        return MPRAnn
+    elif backbone_name == "LegNet":
+        return LegNet
+    elif backbone_name == "LegNetLarge":
+        return LegNetLarge
+    else:
+        raise ValueError("Backbone name not recognized")
+    
+def get_all_backbone_names():
+    return ["MTLucifer", "MTLuciferWithResidualBlocks", "PureCNN", "PureCNNLarge", "ResNet", "MotifBasedFCN", "MotifBasedFCNLarge", "DNABERT", "Enformer", "EnformerFrozenBase", "EnformerRandomInit", "MPRAnn", "LegNet", "LegNetLarge"]
+
+
 class CNNBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding="same", dilation=1, bias=True, gn_num_groups=None, gn_group_size=16):
         super().__init__()
@@ -261,6 +297,35 @@ class PureCNNLarge(nn.Module):
         seq2 = F.relu(seq1)
         outs = self.linear2(seq2)
         return outs
+    
+class ResNet(nn.Module):
+    def __init__(self, embed_dims=1024):
+        super().__init__()
+        self.embed_dims = embed_dims
+        
+        self.initial_conv = nn.Conv1d(in_channels=4, out_channels=512, kernel_size=5, stride=1, padding=1, bias=False)
+        self.resnet = nn.Sequential(
+                                        ResidualBlock(in_channels=512, out_channels=512, kernel_size=5),
+                                        ResidualBlock(in_channels=512, out_channels=512, kernel_size=5),
+                                        ResidualBlock(in_channels=512, out_channels=768, kernel_size=5),
+                                        ResidualBlock(in_channels=768, out_channels=768, kernel_size=5),
+                                        ResidualBlock(in_channels=768, out_channels=1024, kernel_size=5),
+                                        ResidualBlock(in_channels=1024, out_channels=1024, kernel_size=5),
+                                        ResidualBlock(in_channels=1024, out_channels=2048, kernel_size=5),
+                                        ResidualBlock(in_channels=2048, out_channels=2048, kernel_size=5)
+                                   )
+
+        self.adaptive_pool = nn.AdaptiveAvgPool1d(1)
+        self.linear = nn.Linear(2048, self.embed_dims)
+
+    def forward(self, seq):
+        seq = seq.permute(0, 2, 1)
+        seq = self.initial_conv(seq)
+        seq = self.resnet(seq)
+        seq = self.adaptive_pool(seq)
+        seq = seq.reshape(seq.shape[0], -1)
+        outs = self.linear(seq)
+        return outs
 
 class MotifBasedFCN(nn.Module):
     def __init__(self, num_motifs, motif_embed_dims=512):
@@ -327,17 +392,44 @@ class DNABERT(nn.Module):
 class Enformer(nn.Module):
     def __init__(self):
         super().__init__()
-        # self.model = BaseEnformer.from_hparams(
-        #                                             dim = 1536,
-        #                                             depth = 11,
-        #                                             heads = 8,
-        #                                             output_heads = dict(flu = 3),
-        #                                             target_length = 2,
-        #                                         )
         self.model = BaseEnformer.from_pretrained('EleutherAI/enformer-official-rough', target_length=-1)
-        # # freeze the model
-        # for param in self.model.parameters():
-        #     param.requires_grad = False
+        self.embed_dims = self.model.dim*2
+        self.attention_pool = nn.Linear(self.embed_dims, 1)
+
+    def forward(self, seq):
+        outs = self.model(seq, return_only_embeddings=True)
+        attn_weights = self.attention_pool(outs).squeeze(2)
+        attn_weights = F.softmax(attn_weights, dim=1)
+        outs = einsum('b n d, b n -> b d', outs, attn_weights)
+        return outs
+    
+class EnformerFrozenBase(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = BaseEnformer.from_pretrained('EleutherAI/enformer-official-rough', target_length=-1)
+        # freeze the model
+        for param in self.model.parameters():
+            param.requires_grad = False
+        self.embed_dims = self.model.dim*2
+        self.attention_pool = nn.Linear(self.embed_dims, 1)
+
+    def forward(self, seq):
+        outs = self.model(seq, return_only_embeddings=True)
+        attn_weights = self.attention_pool(outs).squeeze(2)
+        attn_weights = F.softmax(attn_weights, dim=1)
+        outs = einsum('b n d, b n -> b d', outs, attn_weights)
+        return outs
+    
+class EnformerRandomInit(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = BaseEnformer.from_hparams(
+                                                    dim = 1536,
+                                                    depth = 11,
+                                                    heads = 8,
+                                                    output_heads = dict(flu = 3),
+                                                    target_length = -1,
+                                              )
         self.embed_dims = self.model.dim*2
         self.attention_pool = nn.Linear(self.embed_dims, 1)
 

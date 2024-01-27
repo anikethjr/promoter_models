@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-import lightning.pytorch as pl
+import lightning as L
 
 from promoter_modelling.utils import fasta_utils
 
@@ -130,7 +130,7 @@ class RoadmapPredictDataset(Dataset):
 
 
 # class used to read, process and build train, val, test sets using the Roadmap dataset
-class RoadmapDataLoader(pl.LightningDataModule):
+class RoadmapDataLoader(L.LightningDataModule):
     def download_data(self):
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)

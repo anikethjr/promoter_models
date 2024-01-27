@@ -19,6 +19,8 @@ import lightning as L
 
 import torchmetrics
 
+from transformers import AutoTokenizer, AutoModel
+
 from promoter_modelling.utils import fasta_utils
 
 np.random.seed(97)
@@ -36,19 +38,29 @@ class MalinoisMPRADataset(Dataset):
         self.cache_dir = cache_dir
         self.use_cache = use_cache
 
-        # create/load one-hot encoded input sequences
-        if self.use_cache and os.path.exists(os.path.join(self.cache_dir, f"{split}_seqs.npy")):
-            self.all_seqs = np.load(os.path.join(self.cache_dir, f"{split}_seqs.npy"))
-            print("Loaded cached one-hot encoded sequences, shape = {}".format(self.all_seqs.shape))
+        # create/load encoded input sequences
+        if self.use_cache and os.path.exists(os.path.join(self.cache_dir, f"{split}_DNABERT_seqs.npy")):
+            self.all_seqs = np.load(os.path.join(self.cache_dir, f"{split}_DNABERT_seqs.npy"))
+            print("Loaded cached encoded sequences, shape = {}".format(self.all_seqs.shape))
         else:
-            print("Creating one-hot encoded sequences")
-            self.all_seqs = []
+            print("Creating encoded sequences")
 
-            for seq in tqdm(self.df['sequence'].values, ncols=0):
-                self.all_seqs.append(fasta_utils.one_hot_encode(seq).astype(np.float32))
-            
-            self.all_seqs = np.array(self.all_seqs)
-            np.save(os.path.join(self.cache_dir, f"{split}_seqs.npy"), self.all_seqs)
+            # load DNABERT tokenizer
+            tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNA_bert_6")
+
+            self.all_seqs = []
+            for promoter_seq in tqdm(self.df['sequence'].values, ncols=0):
+                hexamer_seq = ""
+                for j in range(len(promoter_seq) - 6 + 1):
+                    hexamer_seq = hexamer_seq + promoter_seq[j: j + 6] + " "
+                hexamer_seq = hexamer_seq[:-1]
+
+                # encode sequence
+                encoded_seq = tokenizer.encode(hexamer_seq, add_special_tokens=True, return_tensors="np")
+                self.all_seqs.append(encoded_seq)
+
+            self.all_seqs = np.array(self.all_seqs).squeeze(1)
+            np.save(os.path.join(self.cache_dir, f"{split}_DNABERT_seqs.npy"), self.all_seqs)
             print("Done! Shape = {}".format(self.all_seqs.shape))
         
         # create outputs
