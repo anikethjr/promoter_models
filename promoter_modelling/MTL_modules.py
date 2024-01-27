@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import pytorch_lightning as pl
-from pytorch_lightning.utilities.combined_loader import CombinedLoader
+import lightning.pytorch as pl
+from lightning.pytorch.utilities.combined_loader import CombinedLoader
 
 import torchmtl
 

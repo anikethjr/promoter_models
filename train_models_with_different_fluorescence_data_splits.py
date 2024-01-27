@@ -12,10 +12,10 @@ from sklearn.metrics import r2_score, accuracy_score, precision_score, recall_sc
 
 import torch
 
-import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from pytorch_lightning.callbacks import ModelCheckpoint
+import lightning.pytorch as pl
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch.callbacks import ModelCheckpoint
 
 from promoter_modelling.dataloaders import FluorescenceData, FluorescenceData_classification, FluorescenceData_with_motifs, FluorescenceData_DNABERT, \
                                            LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, STARRSeq
