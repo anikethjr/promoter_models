@@ -19,7 +19,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks import ModelCheckpoint
 
-from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, FluorescenceData_classification, lentiMPRA, STARRSeq, Malinois_MPRA, Malinois_MPRA_DNABERT, Malinois_MPRA_with_motifs
+from promoter_modelling.dataloaders import FluorescenceData, LL100, CCLE, Roadmap, Sharpr_MPRA, SuRE, ENCODETFChIPSeq, FluorescenceData_classification, lentiMPRA, STARRSeq, Malinois_MPRA, Malinois_MPRA_DNABERT, Malinois_MPRA_with_motifs, FluorescenceData_with_motifs, FluorescenceData_DNABERT
 from promoter_modelling import backbone_modules
 from promoter_modelling import MTL_modules
 
@@ -52,7 +52,7 @@ def train_model(args, config, finetune=False):
     if args.modelling_strategy == "joint":
         assert args.joint_tasks is not None, "Must specify tasks to jointly train on"
         tasks = args.joint_tasks.split(",")
-    elif args.modelling_strategy == "pretrain+finetune" or args.modelling_strategy == "pretrain+linear_probing":
+    elif args.modelling_strategy.startswith("pretrain"):
         assert args.pretrain_tasks is not None, "Must specify tasks to pretrain on"
         assert args.finetune_tasks is not None, "Must specify tasks to finetune or perform linear probing on"
         pretrain_tasks = args.pretrain_tasks.split(",")
@@ -62,7 +62,7 @@ def train_model(args, config, finetune=False):
             tasks = finetune_tasks
         else:
             tasks = pretrain_tasks
-    elif args.modelling_strategy == "single_task":
+    elif args.modelling_strategy.startswith("single_task"):
         assert args.single_task is not None, "Must specify task to train on"
         tasks = [args.single_task]
     else:
@@ -144,12 +144,17 @@ def train_model(args, config, finetune=False):
             name_format = "finetune_on_{}_pretrained_on_{}".format("+".join(tasks), "+".join(pretrain_tasks))
         if "linear_probing" in args.modelling_strategy:
             name_format = "linear_probing_on_{}_pretrained_on_{}".format("+".join(tasks), "+".join(pretrain_tasks))
+        if "simple_regression" in args.modelling_strategy:
+            name_format = "simple_regression_on_{}_pretrained_on_{}".format("+".join(tasks), "+".join(pretrain_tasks))
     elif "pretrain" in args.modelling_strategy and not finetune:
         name_format = "pretrain_on_{}".format("+".join(tasks))
     elif "joint" in args.modelling_strategy:
         name_format = "joint_train_on_{}".format("+".join(tasks))
     elif "single" in args.modelling_strategy:
-        name_format = "individual_training_on_{}".format("+".join(tasks))
+        if "simple_regression" in args.modelling_strategy:
+            name_format = "simple_regression_on_{}".format("+".join(tasks))
+        else:
+            name_format = "individual_training_on_{}".format("+".join(tasks))
 
     # map to model classes
     model_class = backbone_modules.get_backbone_class(args.model_name)
@@ -171,14 +176,14 @@ def train_model(args, config, finetune=False):
         if task == "all_tasks" or task == "RNASeq": # special task names
             dataloaders[task] = []
             tasks_set = None
-            if args.modelling_strategy == "pretrain+finetune" or args.modelling_strategy == "pretrain+linear_probing":
+            if args.modelling_strategy.startswith("pretrain"):
                 if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "lentiMPRA", "Malinois_MPRA", "ENCODETFChIPSeq"]
+                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq"]
                 elif task == "RNASeq":
                     tasks_set = ["LL100", "CCLE", "Roadmap"]
             elif args.modelling_strategy == "joint":
                 if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "lentiMPRA", "Malinois_MPRA", "ENCODETFChIPSeq", "FluorescenceData"]
+                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq", "FluorescenceData"]
                 elif task == "RNASeq":
                     tasks_set = ["LL100", "CCLE", "Roadmap"]
 
@@ -198,6 +203,15 @@ def train_model(args, config, finetune=False):
                 elif t == "Sharpr_MPRA":
                     dataloaders[task].append(Sharpr_MPRA.SharprMPRADataLoader(batch_size=batch_size, \
                                                                                 data_dir=os.path.join(root_data_dir, "Sharpr_MPRA")))
+                elif t == "lentiMPRA":
+                    dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "lentiMPRA", \
+                                                                            common_cache_dir=common_cache_dir, 
+                                                                            shrink_test_set=args.shrink_test_set)))
+                elif t == "STARRSeq":
+                    dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
+                                                                            common_cache_dir=common_cache_dir))
                 elif t == "SuRE_classification":
                     for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
                         dataloaders[task].append(SuRE.SuREDataLoader(batch_size=batch_size, \
@@ -223,25 +237,41 @@ def train_model(args, config, finetune=False):
                                                                                         datasets_save_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq_data"), \
                                                                                         shrink_test_set=args.shrink_test_set, \
                                                                                         fasta_shuffle_letters_path=args.fasta_shuffle_letters_path))
-                elif t == "lentiMPRA":
-                    dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
-                                                                            cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
-                                                                            common_cache_dir=common_cache_dir, 
-                                                                            shrink_test_set=args.shrink_test_set))
-                elif t == "STARRSeq":
-                    dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
-                                                                            cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
-                                                                            common_cache_dir=common_cache_dir))
                 elif t == "FluorescenceData":
-                    dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                    if args.model_name.startswith("MotifBased"):
+                        dataloaders[task].append(FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                                     cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs")))
+                    elif "DNABERT" in args.model_name:
+                        dataloaders[task].append(FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                                     cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT")))
+                    elif "Regression" in args.model_name:
+                        dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
+                                                                                        use_construct=True))
+                    else:
+                        dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData")))
                 elif t == "FluorescenceData_DE":
-                    dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
-                                                                        predict_DE=True))
+                    if args.model_name.startswith("MotifBased"):
+                        dataloaders[task].append(FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                                     cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs_DE"), \
+                                                                                                     predict_DE=True))
+                    elif "DNABERT" in args.model_name:
+                        dataloaders[task].append(FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                                     cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT_DE"), \
+                                                                                                     predict_DE=True))
+                    elif "Regression" in args.model_name:
+                        dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
+                                                                                        use_construct=True, \
+                                                                                        predict_DE=True))
+                    else:
+                        dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
+                                                                                        predict_DE=True))
                 elif t == "FluorescenceData_classification":
                     dataloaders[task].append(FluorescenceData_classification.FluorescenceDataLoader(batch_size=batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification")))
+                                                                                                    cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification")))
                 elif t == "Malinois_MPRA":
                     if args.model_name.startswith("MotifBased"):
                         dataloaders[task].append(Malinois_MPRA_with_motifs.MalinoisMPRADataLoader(batch_size=batch_size, \
@@ -267,9 +297,18 @@ def train_model(args, config, finetune=False):
             dataloaders[task] = Roadmap.RoadmapDataLoader(batch_size=batch_size, \
                                                             cache_dir=os.path.join(root_data_dir, "Roadmap"), \
                                                             common_cache_dir=common_cache_dir)
+        elif task == "STARRSeq":
+            dataloaders[task] = STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
+                                                                cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
+                                                                common_cache_dir=common_cache_dir)
         elif task == "Sharpr_MPRA":
             dataloaders[task] = Sharpr_MPRA.SharprMPRADataLoader(batch_size=batch_size, \
                                                                     data_dir=os.path.join(root_data_dir, "Sharpr_MPRA"))
+        elif task == "lentiMPRA":
+            dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
+                                                                cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
+                                                                common_cache_dir=common_cache_dir, 
+                                                                shrink_test_set=args.shrink_test_set)
         elif task == "SuRE_classification":
             dataloaders[task] = []
             for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
@@ -297,25 +336,41 @@ def train_model(args, config, finetune=False):
                                                                         datasets_save_dir=os.path.join(root_data_dir, "ENCODETFChIPSeq_data"), \
                                                                         shrink_test_set=args.shrink_test_set, \
                                                                         fasta_shuffle_letters_path=args.fasta_shuffle_letters_path)
-        elif task == "lentiMPRA":
-            dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
-                                                                cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
-                                                                common_cache_dir=common_cache_dir, \
-                                                                shrink_test_set=args.shrink_test_set)
-        elif task == "STARRSeq":
-            dataloaders[task] = STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
-                                                                cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
-                                                                common_cache_dir=common_cache_dir)
         elif task == "FluorescenceData":
-            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"))
+            if args.model_name.startswith("MotifBased"):
+                dataloaders[task] = FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs"))
+            elif "DNABERT" in args.model_name:
+                dataloaders[task] = FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT"))
+            elif "Regression" in args.model_name:
+                dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
+                                                                            use_construct=True)
+            else:
+                dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "FluorescenceData"))
         elif task == "FluorescenceData_DE":
-            dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
-                                                                        predict_DE=True)
+            if args.model_name.startswith("MotifBased"):
+                dataloaders[task] = FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs_DE"), \
+                                                                                        predict_DE=True)
+            elif "DNABERT" in args.model_name:
+                dataloaders[task] = FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT_DE"), \
+                                                                                        predict_DE=True)
+            elif "Regression" in args.model_name:
+                dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
+                                                                            use_construct=True, \
+                                                                            predict_DE=True)
+            else:
+                dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
+                                                                            predict_DE=True)
         elif task == "FluorescenceData_classification":
             dataloaders[task] = FluorescenceData_classification.FluorescenceDataLoader(batch_size=batch_size, \
-                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification"))
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification"))
         elif task == "FluorescenceData_JURKAT":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
@@ -397,6 +452,16 @@ def train_model(args, config, finetune=False):
                                                 with_motifs=True, \
                                                 use_preconstructed_dataloaders=True, \
                                                 train_mode=train_mode)
+        elif (args.modelling_strategy == "pretrain+simple_regression" and finetune) or (args.modelling_strategy == "single_task_simple_regression"):
+            mtlpredictor = MTL_modules.MTLPredictor(model_class=model_class,\
+                                                all_dataloader_modules=all_dataloaders, \
+                                                batch_size=batch_size, \
+                                                max_epochs=args.max_epochs, \
+                                                lr=lr, \
+                                                weight_decay=weight_decay, \
+                                                use_simple_regression=True, \
+                                                use_preconstructed_dataloaders=True, \
+                                                train_mode=train_mode)
         else:                                                
             mtlpredictor = MTL_modules.MTLPredictor(model_class=model_class,\
                                                 all_dataloader_modules=all_dataloaders, \
@@ -418,105 +483,131 @@ def train_model(args, config, finetune=False):
                     check = True
         if check: # found existing model and using it
             print("Using existing models and evaluating them")
-            
-            # find path to best existing model
-            all_saved_models = os.listdir(cur_models_save_dir)
-            best_model_path = "" 
-            minimize_metric = metric_direction_which_is_optimal == "min"
-            if minimize_metric:
-                best_metric = np.inf
+
+            if (args.modelling_strategy == "pretrain+simple_regression" and finetune) or (args.modelling_strategy == "single_task_simple_regression"):
+                # load model, done automatically by fit_simple_regression
+                mtlpredictor.fit_simple_regression(unified_cache_dir=os.path.join(model_save_dir, name.split("_seed")[0] + "_unified_cache"), 
+                                                   cache_dir=cur_models_save_dir,
+                                                   device=device,
+                                                   batch_size=batch_size,
+                                                   use_existing_models=True)
+
+                # get test set predictions
+                best_model_test_outputs = mtlpredictor.get_predictions_from_simple_regression()
             else:
-                best_metric = -np.inf
-            for path in all_saved_models:
-                val_metric = path.split("=")[-1][:-len(".ckpt")]
-                if "-v" in val_metric:
-                    val_metric = float(val_metric[:-len("-v1")])
-                else:
-                    val_metric = float(val_metric)
-                    
+                # find path to best existing model
+                all_saved_models = os.listdir(cur_models_save_dir)
+                best_model_path = "" 
+                minimize_metric = metric_direction_which_is_optimal == "min"
                 if minimize_metric:
-                    if val_metric < best_metric:
-                        best_metric = val_metric
-                        best_model_path = path
+                    best_metric = np.inf
                 else:
-                    if val_metric > best_metric:
-                        best_metric = val_metric
-                        best_model_path = path
+                    best_metric = -np.inf
+                for path in all_saved_models:
+                    val_metric = path.split("=")[-1][:-len(".ckpt")]
+                    if "-v" in val_metric:
+                        val_metric = float(val_metric[:-len("-v1")])
+                    else:
+                        val_metric = float(val_metric)
                         
-            print("Best existing model is: {}".format(os.path.join(cur_models_save_dir, best_model_path)))
+                    if minimize_metric:
+                        if val_metric < best_metric:
+                            best_metric = val_metric
+                            best_model_path = path
+                    else:
+                        if val_metric > best_metric:
+                            best_metric = val_metric
+                            best_model_path = path
+                            
+                print("Best existing model is: {}".format(os.path.join(cur_models_save_dir, best_model_path)))
 
-            # load it
-            checkpoint = torch.load(os.path.join(cur_models_save_dir, best_model_path), map_location=device)
+                # load it
+                checkpoint = torch.load(os.path.join(cur_models_save_dir, best_model_path), map_location=device)
 
-            new_state_dict = {}
-            for key in checkpoint["state_dict"]:
-                if key.startswith("model."):
-                    new_state_dict[key[len("model."):]] = checkpoint["state_dict"][key]
+                new_state_dict = {}
+                for key in checkpoint["state_dict"]:
+                    if key.startswith("model."):
+                        new_state_dict[key[len("model."):]] = checkpoint["state_dict"][key]
 
-            mtlpredictor.model.load_state_dict(new_state_dict, strict=False)        
-            print("Loaded existing model")
-            
-            # get test set predictions
-            trainer = L.Trainer(accelerator="gpu", devices=1)
-            best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader())
-
+                mtlpredictor.model.load_state_dict(new_state_dict, strict=False)        
+                print("Loaded existing model")
+                
+                # get test set predictions
+                trainer = L.Trainer(accelerator="gpu", devices=1)
+                best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader())
         else:
             print("Training model")
 
-            if "pretrain" in args.modelling_strategy and finetune:
-                new_state_dict = {}
-                for key in pretrained_checkpoint["state_dict"]:
-                    if key.startswith("model."):
-                        new_state_dict[key[len("model."):]] = pretrained_checkpoint["state_dict"][key]
+            if (args.modelling_strategy == "pretrain+simple_regression" and finetune) or (args.modelling_strategy == "single_task_simple_regression"):
+                mtlpredictor.fit_simple_regression(unified_cache_dir=os.path.join(model_save_dir, name.split("_seed")[0] + "_unified_cache"), 
+                                                   cache_dir=cur_models_save_dir,
+                                                   device=device,
+                                                   batch_size=batch_size,
+                                                   use_existing_models=True)
+                
+                # create done file
+                os.makedirs(os.path.join(model_save_dir, name, "default"), exist_ok=True)
+                done_file = os.path.join(model_save_dir, name, "default", "done.txt")
+                with open(done_file, "w+") as f:
+                    f.write("done")
 
-                mtlpredictor.model.load_state_dict(new_state_dict, strict=False)        
-                print("Loaded pretrained model")
-            
-            # freeze backbone for linear probing
-            if "linear_probing" in args.modelling_strategy and finetune:
-                print("Freezing backbone for linear probing")
-                # freeze backbone
-                for param_name, param in mtlpredictor.model.named_parameters():
-                    if param_name.startswith("Backbone.promoter_"):
-                        param.requires_grad = False
+                # get test set predictions
+                best_model_test_outputs = mtlpredictor.get_predictions_from_simple_regression()
+            else:
+                if "pretrain" in args.modelling_strategy and finetune:
+                    new_state_dict = {}
+                    for key in pretrained_checkpoint["state_dict"]:
+                        if key.startswith("model."):
+                            new_state_dict[key[len("model."):]] = pretrained_checkpoint["state_dict"][key]
 
-                for param_name, param in mtlpredictor.model.named_parameters():
-                    if param_name.startswith("Backbone.promoter_"):
-                        assert param.requires_grad == False
+                    mtlpredictor.model.load_state_dict(new_state_dict, strict=False)        
+                    print("Loaded pretrained model")
+                
+                # freeze backbone for linear probing
+                if "linear_probing" in args.modelling_strategy and finetune:
+                    print("Freezing backbone for linear probing")
+                    # freeze backbone
+                    for param_name, param in mtlpredictor.model.named_parameters():
+                        if param_name.startswith("Backbone.promoter_"):
+                            param.requires_grad = False
 
-            wandb_logger = WandbLogger(name=name, \
-                                    project='promoter_modelling_pytorch', log_model=False)
+                    for param_name, param in mtlpredictor.model.named_parameters():
+                        if param_name.startswith("Backbone.promoter_"):
+                            assert param.requires_grad == False
 
-            checkpoint_filename = "best-{epoch:02d}-{" + "{}".format(metric_to_monitor) + ":.5f}"
-            checkpoint_callback = ModelCheckpoint(monitor=metric_to_monitor, \
-                                                dirpath=os.path.join(model_save_dir, name, "default", "checkpoints"), \
-                                                filename=checkpoint_filename, \
-                                                save_top_k=args.save_top_k, mode=metric_direction_which_is_optimal)
+                wandb_logger = WandbLogger(name=name, \
+                                        project='promoter_modelling_pytorch', log_model=False)
 
-            patience = args.patience
-            early_stop_callback = EarlyStopping(monitor=metric_to_monitor, min_delta=0.00, \
-                                                patience=patience, verbose=True, mode=metric_direction_which_is_optimal)
+                checkpoint_filename = "best-{epoch:02d}-{" + "{}".format(metric_to_monitor) + ":.5f}"
+                checkpoint_callback = ModelCheckpoint(monitor=metric_to_monitor, \
+                                                    dirpath=os.path.join(model_save_dir, name, "default", "checkpoints"), \
+                                                    filename=checkpoint_filename, \
+                                                    save_top_k=args.save_top_k, mode=metric_direction_which_is_optimal)
 
-            trainer = L.Trainer(logger=wandb_logger, \
-                                callbacks=[early_stop_callback, checkpoint_callback], \
-                                deterministic=True, \
-                                accelerator="gpu", devices=1, \
-                                log_every_n_steps=10, default_root_dir=model_save_dir, \
-                                max_epochs=max_epochs, \
-                                limit_test_batches=0, reload_dataloaders_every_n_epochs=2, enable_progress_bar = True, \
-                                gradient_clip_val=1.0, num_sanity_val_steps=32)
+                patience = args.patience
+                early_stop_callback = EarlyStopping(monitor=metric_to_monitor, min_delta=0.00, \
+                                                    patience=patience, verbose=True, mode=metric_direction_which_is_optimal)
 
-            trainer.fit(mtlpredictor, mtlpredictor.get_mtldataloader())
+                trainer = L.Trainer(logger=wandb_logger, \
+                                    callbacks=[early_stop_callback, checkpoint_callback], \
+                                    deterministic=True, \
+                                    accelerator="gpu", devices=1, \
+                                    log_every_n_steps=10, default_root_dir=model_save_dir, \
+                                    max_epochs=max_epochs, \
+                                    limit_test_batches=0, reload_dataloaders_every_n_epochs=2, enable_progress_bar = True, \
+                                    gradient_clip_val=1.0, num_sanity_val_steps=32)
 
-            # create done file
-            done_file = os.path.join(model_save_dir, name, "default", "done.txt")
-            with open(done_file, "w+") as f:
-                f.write("done")
+                trainer.fit(mtlpredictor, mtlpredictor.get_mtldataloader())
 
-            wandb.finish()
+                # create done file
+                done_file = os.path.join(model_save_dir, name, "default", "done.txt")
+                with open(done_file, "w+") as f:
+                    f.write("done")
 
-            # get test set predictions
-            best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader(), ckpt_path="best")
+                wandb.finish()
+
+                # get test set predictions
+                best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader(), ckpt_path="best")
 
         # get metrics
         dataloader_to_outputs = {}
@@ -843,7 +934,7 @@ def train_model(args, config, finetune=False):
 args = argparse.ArgumentParser()
 args.add_argument("--config_path", type=str, default="./config.json", help="Path to config file")
 args.add_argument("--model_name", type=str, default="MTLucifer", help="Name of model to use, must be one of {}".format(backbone_modules.get_all_backbone_names()))
-args.add_argument("--modelling_strategy", type=str, required=True, help="Modelling strategy to use, either 'joint', 'pretrain+finetune', 'pretrain+linear_probing' or 'single_task'")
+args.add_argument("--modelling_strategy", type=str, required=True, help="Modelling strategy to use, either 'joint', 'pretrain+finetune', 'pretrain+linear_probing', 'pretrain+simple_regression', 'single_task', or 'single_task_simple_regression'")
 
 args.add_argument("--joint_tasks", type=str, default=None, help="Comma separated list of tasks to jointly train on")
 args.add_argument("--pretrain_tasks", type=str, default=None, help="Comma separated list of tasks to pretrain on")

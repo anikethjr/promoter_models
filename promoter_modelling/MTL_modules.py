@@ -2,6 +2,15 @@ import numpy as np
 import pdb
 import gc
 
+from sklearn import linear_model
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV, PredefinedSplit
+
+from tqdm import tqdm
+
+from joblib import dump, load
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -87,7 +96,8 @@ class MTLPredictor(L.LightningModule):
                  weight_decay=1e-4, \
                  with_motifs=False, \
                  use_preconstructed_dataloaders=False, \
-                 train_mode="min_size"):
+                 train_mode="min_size", \
+                 use_simple_regression=False):
         super().__init__()
         
         # create MTLDataLoader from individual DataLoaders
@@ -114,62 +124,208 @@ class MTLPredictor(L.LightningModule):
             self.backbone = model_class(num_motifs=self.num_motifs)
         else:
             self.backbone = model_class()
-            
-        # create MTL model
-        model_config = [
-                            {
-                                'name': "Backbone",
-                                'layers': self.backbone,
-                                # No anchor_layer means this layer receives input directly
-                            }
-                        ]
         
-        if self.num_tasks == 1: # we don't want the loss scaling when there's only one loss term
-            print("Single dataloader model")
-            task = self.all_dataloaders[0]
-            if model_class == MPRAnn: # MPRAnn has a single linear layer at the end
-                model_config.append({
-                                        'name': task.name,
-                                        'layers': nn.Linear(self.backbone.embed_dims, task.num_outputs),
-                                        'loss': task.loss_fn,
-                                        'loss_weight': torch.tensor(1.0),
-                                        'anchor_layer': 'Backbone'
-                                    })
-            # elif task.name.startswith("FluorescenceData"): # only when predicting fluorescence data use MTLFinalPredictor
-            #     model_config.append({
-            #                             'name': task.name,
-            #                             'layers': MTLFinalPredictor(self.backbone.embed_dims, task.num_outputs),
-            #                             'loss': task.loss_fn,
-            #                             'loss_weight': torch.tensor(0.0),
-            #                             'anchor_layer': 'Backbone'
-            #                         })
-            else:
-                model_config.append({
-                                        'name': task.name,
-                                        'layers': nn.Linear(self.backbone.embed_dims, task.num_outputs),
-                                        'loss': task.loss_fn,
-                                        'loss_weight': torch.tensor(1.0),
-                                        'anchor_layer': 'Backbone'
-                                    })
-        else:
-            for i, task in enumerate(self.all_dataloaders):
-                model_config.append({
-                                        'name': task.name,
-                                        'layers': nn.Linear(self.backbone.embed_dims, task.num_outputs),
-                                        'loss': task.loss_fn,
-                                        # 'loss_weight': torch.tensor(0.0),
-                                        'loss_weight': 'auto',
-                                        'loss_init_val': 0.0,
-                                        'anchor_layer': 'Backbone'
-                                    })
-            
-        self.model = torchmtl.MTLModel(model_config, output_tasks=[task.name for task in self.all_dataloaders])
-        
-        # optimizer hyperparams
-        self.lr = lr
-        self.weight_decay = weight_decay
-        self.max_epochs = max_epochs
+        # whether to use simple sklearn Lasso regression
+        self.use_simple_regression = use_simple_regression
 
+        # if using simple regression, fit the model here
+        if self.use_simple_regression:
+            self.model = self.backbone
+            assert self.num_tasks == 1, "Simple regression only works with one dataloader and that can be FluorescenceData or Malinois_MPRA"
+            assert self.all_dataloaders[0].name in ["FluorescenceData", "MalinoisMPRA"], "Simple regression only works with one dataloader and that can be FluorescenceData or Malinois_MPRA"
+
+        else:
+            # create MTL model
+            model_config = [
+                                {
+                                    'name': "Backbone",
+                                    'layers': self.backbone,
+                                    # No anchor_layer means this layer receives input directly
+                                }
+                            ]
+            
+            if self.num_tasks == 1: # we don't want the loss scaling when there's only one loss term
+                print("Single dataloader model")
+                task = self.all_dataloaders[0]
+                if model_class == MPRAnn: # MPRAnn has a single linear layer at the end
+                    model_config.append({
+                                            'name': task.name,
+                                            'layers': nn.Linear(self.backbone.embed_dims, task.num_outputs),
+                                            'loss': task.loss_fn,
+                                            'loss_weight': torch.tensor(1.0),
+                                            'anchor_layer': 'Backbone'
+                                        })
+                # elif task.name.startswith("FluorescenceData"): # only when predicting fluorescence data use MTLFinalPredictor
+                #     model_config.append({
+                #                             'name': task.name,
+                #                             'layers': MTLFinalPredictor(self.backbone.embed_dims, task.num_outputs),
+                #                             'loss': task.loss_fn,
+                #                             'loss_weight': torch.tensor(0.0),
+                #                             'anchor_layer': 'Backbone'
+                #                         })
+                else:
+                    model_config.append({
+                                            'name': task.name,
+                                            'layers': nn.Linear(self.backbone.embed_dims, task.num_outputs),
+                                            'loss': task.loss_fn,
+                                            'loss_weight': torch.tensor(1.0),
+                                            'anchor_layer': 'Backbone'
+                                        })
+            else:
+                for i, task in enumerate(self.all_dataloaders):
+                    model_config.append({
+                                            'name': task.name,
+                                            'layers': nn.Linear(self.backbone.embed_dims, task.num_outputs),
+                                            'loss': task.loss_fn,
+                                            # 'loss_weight': torch.tensor(0.0),
+                                            'loss_weight': 'auto',
+                                            'loss_init_val': 0.0,
+                                            'anchor_layer': 'Backbone'
+                                        })
+                
+            self.model = torchmtl.MTLModel(model_config, output_tasks=[task.name for task in self.all_dataloaders])
+            
+            # optimizer hyperparams
+            self.lr = lr
+            self.weight_decay = weight_decay
+            self.max_epochs = max_epochs
+
+    def fit_simple_regression(self, unified_cache_dir, cache_dir, device, batch_size, use_existing_models):
+        print("Fitting simple regression models")
+
+        # setup
+        os.makedirs(unified_cache_dir, exist_ok=True)
+        os.makedirs(cache_dir, exist_ok=True)
+        self.model.to(device)
+
+        self.all_final_predictors = []
+        param_grid = [{'alpha': np.logspace(-5, 1, 7, base=10)}]
+        for i in range(self.num_tasks):
+            # get data
+            if self.all_dataloaders[i].name.startswith("FluorescenceData"):
+                self.X = self.all_dataloaders[i].full_dataset.all_seqs
+                self.y = self.all_dataloaders[i].full_dataset.y
+            elif self.all_dataloaders[i].name.startswith("MalinoisMPRA"):
+                self.X = self.all_dataloaders[i].full_dataset.all_seqs
+                self.y = self.all_dataloaders[i].full_dataset.all_outputs
+                self.y_mask = self.all_dataloaders[i].full_dataset.valid_outputs_mask
+            else:
+                raise ValueError("Simple regression only works with FluorescenceData or Malinois_MPRA dataloaders")
+            
+            # put sequences through backbone and save outputs
+            if (not os.path.exists(os.path.join(unified_cache_dir, "{}_backbone_outputs.npy".format(self.all_dataloaders[i].name)))) or (not use_existing_models):
+                print("Running sequences through backbone for {}".format(self.all_dataloaders[i].name))
+                self.backbone_outputs = []
+                for j in tqdm(range(0, len(self.X), batch_size)):
+                    with torch.no_grad():
+                        self.backbone_outputs.append(self.backbone(self.X[j:j+batch_size]).cpu().detach().numpy())
+                self.backbone_outputs = np.vstack(self.backbone_outputs)
+                np.save(os.path.join(unified_cache_dir, "{}_backbone_outputs.npy".format(self.all_dataloaders[i].name)), self.backbone_outputs)
+            else:
+                print("Loading backbone outputs for {}".format(self.all_dataloaders[i].name))
+                self.backbone_outputs = np.load(os.path.join(unified_cache_dir, "{}_backbone_outputs.npy".format(self.all_dataloaders[i].name)))
+            print("Backbone outputs shape: {}".format(self.backbone_outputs.shape))
+
+            # flatten outputs
+            self.backbone_outputs = self.backbone_outputs.reshape(self.backbone_outputs.shape[0], -1)
+            print("Flattened backbone outputs shape: {}".format(self.backbone_outputs.shape))
+
+            for j, output in self.all_dataloaders[i].output_names:
+                if (not os.path.exists(os.path.join(cache_dir, "{}_{}_predictor.joblib".format(self.all_dataloaders[i].name, output)))) or (not use_existing_models):
+                    print("Fitting simple regression model for {}_{}".format(self.all_dataloaders[i].name, output))
+                    if self.all_dataloaders[i].name.startswith("FluorescenceData"):
+                        train_inds = self.all_dataloaders[i].merged["is_train"]
+                        test_inds = self.all_dataloaders[i].merged["is_test"]
+                        val_inds = self.all_dataloaders[i].merged["is_val"]
+
+                        X_train = self.backbone_outputs[train_inds]
+                        y_train = self.y[train_inds, j]
+
+                        X_test = self.backbone_outputs[test_inds]
+                        y_test = self.y[test_inds, j]
+
+                        X_val = self.backbone_outputs[val_inds]
+                        y_val = self.y[val_inds, j]
+
+                        print("X_train shape: {}".format(X_train.shape))
+                        print("y_train shape: {}".format(y_train.shape))
+                        print("X_test shape: {}".format(X_test.shape))
+                        print("y_test shape: {}".format(y_test.shape))
+                        print("X_val shape: {}".format(X_val.shape))
+                        print("y_val shape: {}".format(y_val.shape))
+                    elif self.all_dataloaders[i].name.startswith("MalinoisMPRA"):
+                        train_inds = self.all_dataloaders[i].final_dataset["is_train"]
+                        test_inds = self.all_dataloaders[i].final_dataset["is_test"]
+                        val_inds = self.all_dataloaders[i].final_dataset["is_val"]
+
+                        y_mask = y_mask[train_inds, j]
+                        X_train = self.backbone_outputs[train_inds][y_mask]
+                        y_train = self.y[train_inds, j][y_mask]
+
+                        y_mask = y_mask[test_inds, j]
+                        X_test = self.backbone_outputs[test_inds][y_mask]
+                        y_test = self.y[test_inds, j][y_mask]
+
+                        y_mask = y_mask[val_inds, j]
+                        X_val = self.backbone_outputs[val_inds][y_mask]
+                        y_val = self.y[val_inds, j][y_mask]
+
+                        print("X_train shape: {}".format(X_train.shape))
+                        print("y_train shape: {}".format(y_train.shape))
+                        print("X_test shape: {}".format(X_test.shape))
+                        print("y_test shape: {}".format(y_test.shape))
+                        print("X_val shape: {}".format(X_val.shape))
+                        print("y_val shape: {}".format(y_val.shape))
+
+                    # fit model
+                    ps = PredefinedSplit(np.concatenate((np.full(X_train.shape[0], -1), np.zeros(X_val.shape[0]))))                
+                    predictor = Pipeline((("standard_scaler", StandardScaler()),
+                                          ("lasso", GridSearchCV(linear_model.Lasso(random_state=97),
+                                                                 param_grid,
+                                                                 cv=ps,
+                                                                 n_jobs=4))))
+                    this_X_train = np.vstack((X_train, X_val))
+                    this_y_train = np.concatenate((y_train, y_val))
+                    predictor.fit(this_X_train, this_y_train)
+
+                    # save model
+                    dump(predictor, os.path.join(cache_dir, "{}_{}_predictor.joblib".format(self.all_dataloaders[i].name, output)))
+                    self.all_final_predictors.append(predictor)
+                    print("Best alpha: {}".format(predictor.named_steps["lasso"].best_params_["alpha"]))
+                    print("Best score: {}".format(predictor.named_steps["lasso"].best_score_))
+                else:
+                    # load model
+                    print("Loading simple regression model for {}_{}".format(self.all_dataloaders[i].name, output))
+                    predictor = load(os.path.join(cache_dir, "{}_{}_predictor.joblib".format(self.all_dataloaders[i].name, output)))
+                    self.all_final_predictors.append(predictor)
+                    print("Best alpha: {}".format(predictor.named_steps["lasso"].best_params_["alpha"]))
+                    print("Best score: {}".format(predictor.named_steps["lasso"].best_score_))
+    
+    def get_predictions_from_simple_regression(self):
+        print("Getting predictions from simple regression models")
+        all_y = []
+        all_preds = []
+        for i in range(self.num_tasks):
+            for j, output in enumerate(self.all_dataloaders[i].output_names):
+                predictor = self.all_final_predictors[j]
+
+                if self.all_dataloaders[i].name.startswith("FluorescenceData"):
+                    X_test = self.backbone_outputs[self.all_dataloaders[i].merged["is_test"]]
+                    y_test = self.y[self.all_dataloaders[i].merged["is_test"], j]
+                elif self.all_dataloaders[i].name.startswith("MalinoisMPRA"):
+                    X_test = self.backbone_outputs[self.all_dataloaders[i].final_dataset["is_test"]]
+                    y_test = self.y[self.all_dataloaders[i].final_dataset["is_test"], j]
+                    # set nan to -100000
+                    y_test[np.isnan(y_test)] = -100000
+                else:
+                    raise ValueError("Simple regression only works with FluorescenceData or Malinois_MPRA dataloaders")
+                
+                y_pred = predictor.predict(X_test)
+                all_y.append(y_test)
+                all_preds.append(y_pred)
+        outs = [{"y": np.stack(all_y), "pred": np.stack(all_preds)}]
+        return outs
+        
     def get_mtldataloader(self):
         return self.mtldataloader
         

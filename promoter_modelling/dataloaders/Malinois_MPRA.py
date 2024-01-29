@@ -352,6 +352,9 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
         print("Creating val dataset")
         self.val_dataset = MalinoisMPRADataset(self.val_set, "val", self.num_cells, self.cell_names, \
                                                cache_dir=self.cache_dir, use_cache=use_cache, shrink_set=shrink_test_set)
+        print("Creating full dataset")
+        self.full_dataset = MalinoisMPRADataset(self.final_dataset, "full", self.num_cells, self.cell_names, \
+                                                cache_dir=self.cache_dir, use_cache=use_cache)
         
         num_all_pairs = len(self.train_dataset) + len(self.test_dataset) + len(self.val_dataset)
         

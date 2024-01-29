@@ -176,12 +176,12 @@ def train_model(args, config, finetune=False):
             tasks_set = None
             if args.modelling_strategy == "pretrain+finetune" or args.modelling_strategy == "pretrain+linear_probing":
                 if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "lentiMPRA", "ENCODETFChIPSeq"]
+                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq"]
                 elif task == "RNASeq":
                     tasks_set = ["LL100", "CCLE", "Roadmap"]
             elif args.modelling_strategy == "joint":
                 if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "lentiMPRA", "ENCODETFChIPSeq", "FluorescenceData"]
+                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq", "FluorescenceData"]
                 elif task == "RNASeq":
                     tasks_set = ["LL100", "CCLE", "Roadmap"]
 
@@ -204,7 +204,8 @@ def train_model(args, config, finetune=False):
                 elif t == "lentiMPRA":
                     dataloaders[task].append(lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "lentiMPRA", \
-                                                                            common_cache_dir=common_cache_dir)))
+                                                                            common_cache_dir=common_cache_dir, 
+                                                                            shrink_test_set=args.shrink_test_set)))
                 elif t == "STARRSeq":
                     dataloaders[task].append(STARRSeq.STARRSeqDataLoader(batch_size=batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "STARRSeq"), \
@@ -241,6 +242,10 @@ def train_model(args, config, finetune=False):
                     elif "DNABERT" in args.model_name:
                         dataloaders[task].append(FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=batch_size, \
                                                                                                      cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT")))
+                    elif "Regression" in args.model_name:
+                        dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
+                                                                                        use_construct=True))
                     else:
                         dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData")))
@@ -253,6 +258,11 @@ def train_model(args, config, finetune=False):
                         dataloaders[task].append(FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=batch_size, \
                                                                                                      cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT_DE"), \
                                                                                                      predict_DE=True))
+                    elif "Regression" in args.model_name:
+                        dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
+                                                                                        use_construct=True, \
+                                                                                        predict_DE=True))
                     else:
                         dataloaders[task].append(FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
@@ -295,7 +305,8 @@ def train_model(args, config, finetune=False):
         elif task == "lentiMPRA":
             dataloaders[task] = lentiMPRA.lentiMPRADataLoader(batch_size=batch_size, \
                                                                 cache_dir=os.path.join(root_data_dir, "lentiMPRA"), \
-                                                                common_cache_dir=common_cache_dir)
+                                                                common_cache_dir=common_cache_dir, 
+                                                                shrink_test_set=args.shrink_test_set)
         elif task == "SuRE_classification":
             dataloaders[task] = []
             for genome_id in ["SuRE42_HG02601", "SuRE43_GM18983", "SuRE44_HG01241", "SuRE45_HG03464"]:
@@ -330,6 +341,10 @@ def train_model(args, config, finetune=False):
             elif "DNABERT" in args.model_name:
                 dataloaders[task] = FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT"))
+            elif "Regression" in args.model_name:
+                dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
+                                                                            use_construct=True)
             else:
                 dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "FluorescenceData"))
@@ -342,6 +357,11 @@ def train_model(args, config, finetune=False):
                 dataloaders[task] = FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT_DE"), \
                                                                                         predict_DE=True)
+            elif "Regression" in args.model_name:
+                dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                            cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
+                                                                            use_construct=True, \
+                                                                            predict_DE=True)
             else:
                 dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                             cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
@@ -352,15 +372,15 @@ def train_model(args, config, finetune=False):
         elif task == "FluorescenceData_JURKAT":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
-                                                                        return_specified_cells=0)
+                                                                        return_specified_cells=[0])
         elif task == "FluorescenceData_K562":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
-                                                                        return_specified_cells=1)
+                                                                        return_specified_cells=[1])
         elif task == "FluorescenceData_THP1":
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
-                                                                        return_specified_cells=2)
+                                                                        return_specified_cells=[2])
         elif task == "Malinois_MPRA":
             if args.model_name.startswith("MotifBased"):
                 dataloaders[task] = Malinois_MPRA_with_motifs.MalinoisMPRADataLoader(batch_size=batch_size, \

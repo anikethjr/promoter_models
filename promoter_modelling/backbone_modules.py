@@ -41,6 +41,8 @@ def get_backbone_class(backbone_name):
         return Enformer
     elif backbone_name == "EnformerFrozenBase":
         return EnformerFrozenBase
+    elif backbone_name == "EnformerFullFrozenBase":
+        return EnformerFullFrozenBase
     elif backbone_name == "EnformerRandomInit":
         return EnformerRandomInit
     elif backbone_name == "MPRAnn":
@@ -53,7 +55,7 @@ def get_backbone_class(backbone_name):
         raise ValueError("Backbone name not recognized")
     
 def get_all_backbone_names():
-    return ["MTLucifer", "MTLuciferWithResidualBlocks", "PureCNN", "PureCNNLarge", "ResNet", "MotifBasedFCN", "MotifBasedFCNLarge", "DNABERT", "Enformer", "EnformerFrozenBase", "EnformerRandomInit", "MPRAnn", "LegNet", "LegNetLarge"]
+    return ["MTLucifer", "MTLuciferWithResidualBlocks", "PureCNN", "PureCNNLarge", "ResNet", "MotifBasedFCN", "MotifBasedFCNLarge", "DNABERT", "Enformer", "EnformerFrozenBase", "EnformerFullFrozenBase", "EnformerRandomInit", "MPRAnn", "LegNet", "LegNetLarge"]
 
 
 class CNNBlock(nn.Module):
@@ -418,6 +420,22 @@ class EnformerFrozenBase(nn.Module):
         attn_weights = self.attention_pool(outs).squeeze(2)
         attn_weights = F.softmax(attn_weights, dim=1)
         outs = einsum('b n d, b n -> b d', outs, attn_weights)
+        return outs
+    
+class EnformerFullFrozenBase(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = BaseEnformer.from_pretrained('EleutherAI/enformer-official-rough', target_length=-1)
+        # freeze the model
+        for param in self.model.parameters():
+            param.requires_grad = False
+        self.embed_dims = None
+
+    def forward(self, seq):
+        outs = self.model(seq)
+        human_outs = outs["human"]
+        mouse_outs = outs["mouse"]
+        outs = torch.cat([human_outs, mouse_outs], dim=2)
         return outs
     
 class EnformerRandomInit(nn.Module):

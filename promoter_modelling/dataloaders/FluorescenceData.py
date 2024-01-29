@@ -46,7 +46,7 @@ def GC_content(seq):
     return float(num_GC) / len(seq)
 
 class FluorescenceDataset(Dataset):
-    def __init__(self, df, split_name, num_cells, cell_names, cache_dir, use_cache):
+    def __init__(self, df, split_name, num_cells, cell_names, cache_dir, use_cache, use_construct):
         super().__init__()
 
         self.df = df
@@ -54,8 +54,13 @@ class FluorescenceDataset(Dataset):
         self.cell_names = cell_names
                 
         # create/load one-hot encoded input sequences
-        if use_cache and os.path.exists(os.path.join(cache_dir, "{}_seqs.npy".format(split_name))):
-            self.all_seqs = np.load(os.path.join(cache_dir, "{}_seqs.npy".format(split_name)))
+        if use_construct:
+            file_name = "{}_seqs_construct.npy".format(split_name)
+        else:
+            file_name = "{}_seqs.npy".format(split_name)
+
+        if use_cache and os.path.exists(os.path.join(cache_dir, file_name)):
+            self.all_seqs = np.load(os.path.join(cache_dir, file_name))
             print("Loaded cached one-hot encoded sequences, shape = {}".format(self.all_seqs.shape))
         else:
             print("Creating one-hot encoded sequences")
@@ -66,7 +71,7 @@ class FluorescenceDataset(Dataset):
                 onehot_seq = fasta_utils.one_hot_encode(promoter_seq).astype(np.float32)                  
                 self.all_seqs.append(onehot_seq)
             self.all_seqs = np.array(self.all_seqs)
-            np.save(os.path.join(cache_dir, "{}_seqs.npy".format(split_name)), self.all_seqs)
+            np.save(os.path.join(cache_dir, file_name), self.all_seqs)
             print("Done! Shape = {}".format(self.all_seqs.shape))
         
         # create MTL targets
@@ -131,7 +136,8 @@ class FluorescenceDataLoader(L.LightningDataModule):
                  zscore = False, \
                  use_cache = True, \
                  return_specified_cells = None, \
-                 predict_DE = False):
+                 predict_DE = False, 
+                 use_construct=False):
         
         super().__init__()
 
@@ -179,6 +185,7 @@ class FluorescenceDataLoader(L.LightningDataModule):
         
         self.zscore = zscore
         self.predict_DE = predict_DE
+        self.use_construct = use_construct
 
         if self.predict_DE:
             self.merged_cache_path = os.path.join(self.cache_dir, "merged_DE.tsv")
@@ -282,6 +289,39 @@ class FluorescenceDataLoader(L.LightningDataModule):
             self.merged.to_csv(self.merged_cache_path, sep="\t", index=False)
         
         self.merged = pd.read_csv(self.merged_cache_path, sep="\t")
+
+        # add scaffolding to the sequence if using constructs
+        if self.use_construct:
+            full_construct = "GGGTCTCTCTGGTTAGACCAGATCTGAGCCTGGGAGCTCTCTGGCTAACTAGGGAACCCACTGCTTAAGCCTCAATAAAGCTTGCCTTGAGTGCTTCAAGTAGTGTGTGCCCGTCTGTTGTGTGACTCTGGTAACTAGAGATCCCTCAGACCCTTTTAGTCAGTGTGGAAAATCTCTAGCAGTGGCGCCCGAACAGGGACTTGAAAGCGAAAGGGAAACCAGAGGAGCTCTCTCGACGCAGGACTCGGCTTGCTGAAGCGCGCACGGCAAGAGGCGAGGGGCGGCGACTGGTGAGTACGCCAAAAATTTTGACTAGCGGAGGCTAGAAGGAGAGAGATGGGTGCGAGAGCGTCAGTATTAAGCGGGGGAGAATTAGATCGCGATGGGAAAAAATTCGGTTAAGGCCAGGGGGAAAGAAAAAATATAAATTAAAACATATAGTATGGGCAAGCAGGGAGCTAGAACGATTCGCAGTTAATCCTGGCCTGTTAGAAACATCAGAAGGCTGTAGACAAATACTGGGACAGCTACAACCATCCCTTCAGACAGGATCAGAAGAACTTAGATCATTATATAATACAGTAGCAACCCTCTATTGTGTGCATCAAAGGATAGAGATAAAAGACACCAAGGAAGCTTTAGACAAGATAGAGGAAGAGCAAAACAAAAGTAAGACCACCGCACAGCAAGCGGCCGCTGATCTTCAGACCTGGAGGAGGAGATATGAGGGACAATTGGAGAAGTGAATTATATAAATATAAAGTAGTAAAAATTGAACCATTAGGAGTAGCACCCACCAAGGCAAAGAGAAGAGTGGTGCAGAGAGAAAAAAGAGCAGTGGGAATAGGAGCTTTGTTCCTTGGGTTCTTGGGAGCAGCAGGAAGCACTATGGGCGCAGCGTCAATGACGCTGACGGTACAGGCCAGACAATTATTGTCTGGTATAGTGCAGCAGCAGAACAATTTGCTGAGGGCTATTGAGGCGCAACAGCATCTGTTGCAACTCACAGTCTGGGGCATCAAGCAGCTCCAGGCAAGAATCCTGGCTGTGGAAAGATACCTAAAGGATCAACAGCTCCTGGGGATTTGGGGTTGCTCTGGAAAACTCATTTGCACCACTGCTGTGCCTTGGAATGCTAGTTGGAGTAATAAATCTCTGGAACAGATTTGGAATCACACGACCTGGATGGAGTGGGACAGAGAAATTAACAATTACACAAGCTTAATACACTCCTTAATTGAAGAATCGCAAAACCAGCAAGAAAAGAATGAACAAGAATTATTGGAATTAGATAAATGGGCAAGTTTGTGGAATTGGTTTAACATAACAAATTGGCTGTGGTATATAAAATTATTCATAATGATAGTAGGAGGCTTGGTAGGTTTAAGAATAGTTTTTGCTGTACTTTCTATAGTGAATAGAGTTAGGCAGGGATATTCACCATTATCGTTTCAGACCCACCTCCCAACCCCGAGGGGACCCGACAGGCCCGAAGGAATAGAAGAAGAAGGTGGAGAGAGAGACAGAGACAGATCCATTCGATTAGTGAACGGATCGGCACTGCGTGCGCCAATTCTGCAGACAAATGGCAGTATTCATCCACAATTTTAAAAGAAAAGGGGGGATTGGGGGGTACAGTGCAGGGGAAAGAATAGTAGACATAATAGCAACAGACATACAAACTAAAGAATTACAAAAACAAATTACAAAAATTCAAAATTTTCGGGTTTATTACAGGGAATGGACTAACTACGNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNGGTAGGCGTGTACGGTGGGAGGCCTATATAAGCAGAGCTGGACTTAGCCTTTAGTGAACCGTCAGAATTAATTCAGATCGATCTACCAGAACCGTCAGATCCGCTAGAGATTACGCCAACCGCCACCATGGGCAGCATGGTGAGCAAGGGCGAGGAGCTGTTCACCGGGGTGGTGCCCATCCTGGTCGAGCTGGACGGCGACGTAAACGGCCACAAGTTCAGCGTGTCCGGCGAGGGCGAGGGCGATGCCACCTACGGCAAGCTGACCCTGAAGTTCATCTGCACCACCGGCAAGCTGCCCGTGCCCTGGCCCACCCTCGTGACCACCCTGACCTACGGCGTGCAGTGCTTCAGCCGCTACCCCGACCACATGAAGCAGCACGACTTCTTCAAGTCCGCCATGCCCGAAGGCTACGTCCAGGAGCGCACCATCTTCTTCAAGGACGACGGCAACTACAAGACCCGCGCCGAGGTGAAGTTCGAGGGTGACACCCTGGTGAACCGCATCGAGCTGAAGGGCATCGACTTCAAGGAGGACGGCAACATCCTGGGGCACAAGCTGGAGTACAACTACAACAGCCACAACGTCTATATCATGGCCGACAAGCAGAAGAACGGCATCAAGGTGAACTTCAAGATCCGCCACAACATCGAGGACGGCAGCGTGCAGCTCGCCGACCACTACCAGCAGAACACCCCCATCGGCGACGGCCCCGTGCTGCTGCCCGACAACCACTACCTGAGCACCCAGTCCGCCCTGAGCAAAGACCCCAACGAGAAGCGCGATCACATGGTCCTGCTGGAGTTCGTGACCGCCGCCGGGATCACTCTCGGCATGGACGAGCTGTACAAGTCAGGCTAATAACAGCTTCCGGACTCTAGAACATCCCTACAGGTGATATCCTCGCTACGTGTGTCAGTTAGGGTGTGGAAAGTCCCCAGGCTCCCCAGCAGGCAGAAGTATGCAAAGCATGCATCTCAATTAGTCAGCAACCAGGTGTGGAAAGTCCCCAGGCTCCCCAGCAGGCAGAAGTATGCAAAGCATGCATCTCAATTAGTCAGCAACCATAGTCCCGCCCCTAACTCCGCCCATCCCGCCCCTAACTCCGCCCAGTTCCGCCCATTCTCCGCCCCATGGCTGACTAATTTTTTTTATTTATGCAGAGGCCGAGGCCGCCTCTGCCTCTGAGCTATTCCAGAAGTAGTGAGGAGGCTTTTTTGGAGGCCTAGGCTTTTGCAAAAAGCTCCCGGGAGCTTGTATATCCATTTTCGGATCTGATCAAGAGACAGGGCAACCGCCACCATGACCGAGTACAAGCCCACGGTGCGCCTCGCCACCCGCGACGACGTCCCCAGGGCCGTACGCACCCTCGCCGCCGCGTTCGCCGACTACCCCGCCACGCGCCACACCGTCGATCCGGACCGCCACATCGAGCGGGTCACCGAGCTGCAAGAACTCTTCCTCACGCGCGTCGGGCTCGACATCGGCAAGGTGTGGGTCGCGGACGACGGCGCCGCGGTGGCGGTCTGGACCACGCCGGAGAGCGTCGAAGCGGGGGCGGTGTTCGCCGAGATCGGCCCGCGCATGGCCGAGTTGAGCGGTTCCCGGCTGGCCGCGCAGCAACAGATGGAAGGCCTCCTGGCGCCGCACCGGCCCAAGGAGCCCGCGTGGTTCCTGGCCACCGTCGGCGTGTCGCCCGACCACCAGGGCAAGGGTCTGGGCAGCGCCGTCGTGCTCCCCGGAGTGGAGGCGGCCGAGCGCGCCGGGGTGCCCGCCTTCCTGGAAACCTCCGCGCCCCGCAACCTCCCCTTCTACGAGCGGCTCGGCTTCACCGTCACCGCCGACGTCGAGGTGCCCGAAGGACCGCGCACCTGGTGCATGACCCGCAAGCCCGGTGCCTAATAACCCTGCTAATAATTCACTCCTCCTGGTCGCCTCTTCATACTCCCTGGATAGTTAAGTCGACAATCAACCTCTGGATTACAAAATTTGTGAAAGATTGACTGGTATTCTTAACTATGTTGCTCCTTTTACGCTATGTGGATACGCTGCTTTAATGCCTTTGTATCATGCTATTGCTTCCCGTATGGCTTTCATTTTCTCCTCCTTGTATAAATCCTGGTTGCTGTCTCTTTATGAGGAGTTGTGGCCCGTTGTCAGGCAACGTGGCGTGGTGTGCACTGTGTTTGCTGACGCAACCCCCACTGGTTGGGGCATTGCCACCACCTGTCAGCTCCTTTCCGGGACTTTCGCTTTCCCCCTCCCTATTGCCACGGCGGAACTCATCGCCGCCTGCCTTGCCCGCTGCTGGACAGGGGCTCGGCTGTTGGGCACTGACAATTCCGTGGTGTTGTCGGGGAAATCATCGTCCTTTCCTTGGCTGCTCGCCTGTGTTGCCACCTGGATTCTGCGCGGGACGTCCTTCTGCTACGTCCCTTCGGCCCTCAATCCAGCGGACCTTCCTTCCCGCGGCCTGCTGCCGGCTCTGCGGCCTCTTCCGCGTCTTCGCCTTCGCCCTCAGACGAGTCGGATCTCCCTTTGGGCCGCCTCCCCGCGTCGACTTTAAGACCAATGACTTACAAGGCAGCTGTAGATCTTAGCCACTTTTTAAAAGAAAAGGGGGGACTGGAAGGGCTAATTCACTCCCAACGAAGACAAGATCTGCTTTTTGCTTGTACTGGGTCTCTCTGGTTAGACCAGATCTGAGCCTGGGAGCTCTCTGGCTAACTAGGGAACCCACTGCTTAAGCCTCAATAAAGCTTGCCTTGAGTGCTTCAAGTAGTGTGTGCCCGTCTGTTGTGTGACTCTGGTAACTAGAGATCCCTCAGACCCTTTTAGTCAGTGTGGAAAATCTCTAGCA"
+            NGS_F_start_ind = 1734
+            NGS_F_end_ind = 1753
+
+            designed_promoter_start_ind = 1754
+            designed_promoter_end_ind = 1754 + 250 - 1
+
+            assert full_construct.find("N") == designed_promoter_start_ind
+            assert full_construct.rfind("N") == designed_promoter_end_ind
+
+            EGFP_end_ind = 2910 # defined as end of conn H-N
+
+            # trim off parts that are not relevant for regulation of EGFP
+            construct = full_construct[NGS_F_start_ind:EGFP_end_ind + 1]
+
+            # update designed_promoter_start_ind and designed_promoter_end_ind after trimming
+            designed_promoter_start_ind = designed_promoter_start_ind - NGS_F_start_ind
+            designed_promoter_end_ind = designed_promoter_end_ind - NGS_F_start_ind
+
+            assert construct.find("N") == designed_promoter_start_ind
+            assert construct.rfind("N") == designed_promoter_end_ind
+
+            print(f"Length of functional construct to be supplied to models = {len(construct)}")
+
+            base_input = construct
+
+            print(f"Length of final base input to be supplied to models = {len(base_input)}")
+
+            self.merged["sequence"] = self.merged.apply(lambda x: base_input[:designed_promoter_start_ind] + x + base_input[designed_promoter_end_ind+1:], axis=1)
+
         self.all_classes = sorted(list(set(self.merged["cell_specific_class"])))
         
         self.train_set = self.merged[self.merged["is_train"]].reset_index(drop=True)
@@ -313,16 +353,16 @@ class FluorescenceDataLoader(L.LightningDataModule):
                 
         print("Creating train dataset")
         self.train_dataset = FluorescenceDataset(self.train_set, "train", self.num_cells, self.cell_names, \
-                                                 cache_dir=self.cache_dir, use_cache=use_cache)
+                                                 cache_dir=self.cache_dir, use_cache=use_cache, use_construct=self.use_construct)
         print("Creating test dataset")
         self.test_dataset = FluorescenceDataset(self.test_set, "test", self.num_cells, self.cell_names, \
-                                                cache_dir=self.cache_dir, use_cache=use_cache)
+                                                cache_dir=self.cache_dir, use_cache=use_cache, use_construct=self.use_construct)
         print("Creating val dataset")
         self.val_dataset = FluorescenceDataset(self.val_set, "val", self.num_cells, self.cell_names, \
-                                               cache_dir=self.cache_dir, use_cache=use_cache)
+                                               cache_dir=self.cache_dir, use_cache=use_cache, use_construct=self.use_construct)
         print("Creating full dataset")
         self.full_dataset = FluorescenceDataset(self.merged, "full", self.num_cells, self.cell_names, \
-                                                cache_dir=self.cache_dir, use_cache=use_cache)
+                                                cache_dir=self.cache_dir, use_cache=use_cache, use_construct=self.use_construct)
         
         print("Train set has {} promoter-expression pairs from {} total pairs ({:.2f}% of dataset)".format(len(self.train_dataset), \
                                                                                                            self.merged.shape[0], \
