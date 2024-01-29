@@ -281,7 +281,7 @@ class MTLPredictor(L.LightningModule):
                     # fit model
                     ps = PredefinedSplit(np.concatenate((np.full(X_train.shape[0], -1), np.zeros(X_val.shape[0]))))                
                     predictor = Pipeline((("standard_scaler", StandardScaler()),
-                                          ("lasso", GridSearchCV(linear_model.Lasso(random_state=97, max_iter=100000),
+                                          ("lasso", GridSearchCV(linear_model.Lasso(random_state=97, max_iter=10000),
                                                                  param_grid,
                                                                  cv=ps,
                                                                  n_jobs=4))))
