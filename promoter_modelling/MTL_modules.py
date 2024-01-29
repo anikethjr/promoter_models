@@ -323,7 +323,7 @@ class MTLPredictor(L.LightningModule):
                 y_pred = predictor.predict(X_test)
                 all_y.append(y_test)
                 all_preds.append(y_pred)
-        outs = [{"y": np.stack(all_y), "pred": np.stack(all_preds)}]
+        outs = [{"y": torch.tensor(np.stack(all_y)), "pred": torch.tensor(np.stack(all_preds))}]
         return outs
         
     def get_mtldataloader(self):
