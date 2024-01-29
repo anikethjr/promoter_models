@@ -320,7 +320,7 @@ class FluorescenceDataLoader(L.LightningDataModule):
 
             print(f"Length of final base input to be supplied to models = {len(base_input)}")
 
-            self.merged["sequence"] = self.merged.apply(lambda x: base_input[:designed_promoter_start_ind] + x + base_input[designed_promoter_end_ind+1:], axis=1)
+            self.merged["sequence"] = self.merged.apply(lambda x: base_input[:designed_promoter_start_ind] + x["sequence"] + base_input[designed_promoter_end_ind+1:], axis=1)
 
         self.all_classes = sorted(list(set(self.merged["cell_specific_class"])))
         
