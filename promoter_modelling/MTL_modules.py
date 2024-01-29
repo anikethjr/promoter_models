@@ -279,12 +279,18 @@ class MTLPredictor(L.LightningModule):
                         print("y_val shape: {}".format(y_val.shape))
 
                     # fit model
-                    ps = PredefinedSplit(np.concatenate((np.full(X_train.shape[0], -1), np.zeros(X_val.shape[0]))))                
+                    ps = PredefinedSplit(np.concatenate((np.full(X_train.shape[0], -1), np.zeros(X_val.shape[0]))))      
+
+                    if self.all_dataloaders[i].name.startswith("Fluorescence"):
+                        n_jobs = 4
+                    elif self.all_dataloaders[i].name.startswith("MalinoisMPRA"):
+                        n_jobs = 1
+
                     predictor = Pipeline((("standard_scaler", StandardScaler()),
                                           ("lasso", GridSearchCV(linear_model.Lasso(random_state=97, max_iter=10000),
                                                                  param_grid,
                                                                  cv=ps,
-                                                                 n_jobs=4))))
+                                                                 n_jobs=n_jobs))))
                     this_X_train = np.vstack((X_train, X_val))
                     this_y_train = np.concatenate((y_train, y_val))
                     predictor.fit(this_X_train, this_y_train)
