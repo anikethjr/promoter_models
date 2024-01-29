@@ -202,7 +202,7 @@ class MTLPredictor(L.LightningModule):
         param_grid = [{'alpha': np.logspace(-5, 1, 7, base=10)}]
         for i in range(self.num_tasks):
             # get data
-            if self.all_dataloaders[i].name.startswith("FluorescenceData"):
+            if self.all_dataloaders[i].name.startswith("Fluorescence"):
                 self.X = self.all_dataloaders[i].full_dataset.all_seqs
                 self.y = self.all_dataloaders[i].full_dataset.y
             elif self.all_dataloaders[i].name.startswith("MalinoisMPRA"):
@@ -233,7 +233,7 @@ class MTLPredictor(L.LightningModule):
             for j, output in self.all_dataloaders[i].output_names:
                 if (not os.path.exists(os.path.join(cache_dir, "{}_{}_predictor.joblib".format(self.all_dataloaders[i].name, output)))) or (not use_existing_models):
                     print("Fitting simple regression model for {}_{}".format(self.all_dataloaders[i].name, output))
-                    if self.all_dataloaders[i].name.startswith("FluorescenceData"):
+                    if self.all_dataloaders[i].name.startswith("Fluorescence"):
                         train_inds = self.all_dataloaders[i].merged["is_train"]
                         test_inds = self.all_dataloaders[i].merged["is_test"]
                         val_inds = self.all_dataloaders[i].merged["is_val"]
@@ -309,7 +309,7 @@ class MTLPredictor(L.LightningModule):
             for j, output in enumerate(self.all_dataloaders[i].output_names):
                 predictor = self.all_final_predictors[j]
 
-                if self.all_dataloaders[i].name.startswith("FluorescenceData"):
+                if self.all_dataloaders[i].name.startswith("Fluorescence"):
                     X_test = self.backbone_outputs[self.all_dataloaders[i].merged["is_test"]]
                     y_test = self.y[self.all_dataloaders[i].merged["is_test"], j]
                 elif self.all_dataloaders[i].name.startswith("MalinoisMPRA"):
