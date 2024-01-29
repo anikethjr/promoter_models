@@ -230,7 +230,7 @@ class MTLPredictor(L.LightningModule):
             self.backbone_outputs = self.backbone_outputs.reshape(self.backbone_outputs.shape[0], -1)
             print("Flattened backbone outputs shape: {}".format(self.backbone_outputs.shape))
 
-            for j, output in self.all_dataloaders[i].output_names:
+            for j, output in enumerate(self.all_dataloaders[i].output_names):
                 if (not os.path.exists(os.path.join(cache_dir, "{}_{}_predictor.joblib".format(self.all_dataloaders[i].name, output)))) or (not use_existing_models):
                     print("Fitting simple regression model for {}_{}".format(self.all_dataloaders[i].name, output))
                     if self.all_dataloaders[i].name.startswith("Fluorescence"):
