@@ -218,7 +218,7 @@ class MTLPredictor(L.LightningModule):
                 self.backbone_outputs = []
                 for j in tqdm(range(0, len(self.X), batch_size)):
                     with torch.no_grad():
-                        self.backbone_outputs.append(self.backbone(self.X[j:j+batch_size]).cpu().detach().numpy())
+                        self.backbone_outputs.append(self.backbone(torch.tensor(self.X[j:j+batch_size]).to(device=device)).cpu().detach().numpy())
                 self.backbone_outputs = np.vstack(self.backbone_outputs)
                 np.save(os.path.join(unified_cache_dir, "{}_backbone_outputs.npy".format(self.all_dataloaders[i].name)), self.backbone_outputs)
             else:
