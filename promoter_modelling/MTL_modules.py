@@ -197,6 +197,7 @@ class MTLPredictor(L.LightningModule):
         os.makedirs(unified_cache_dir, exist_ok=True)
         os.makedirs(cache_dir, exist_ok=True)
         self.model.to(device)
+        self.model.eval()
 
         self.all_final_predictors = []
         param_grid = [{'alpha': np.logspace(-5, 1, 7, base=10)}]
@@ -280,7 +281,7 @@ class MTLPredictor(L.LightningModule):
                     # fit model
                     ps = PredefinedSplit(np.concatenate((np.full(X_train.shape[0], -1), np.zeros(X_val.shape[0]))))                
                     predictor = Pipeline((("standard_scaler", StandardScaler()),
-                                          ("lasso", GridSearchCV(linear_model.Lasso(random_state=97),
+                                          ("lasso", GridSearchCV(linear_model.Lasso(random_state=97, max_iter=100000),
                                                                  param_grid,
                                                                  cv=ps,
                                                                  n_jobs=4))))
