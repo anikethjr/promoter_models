@@ -132,7 +132,7 @@ class MTLPredictor(L.LightningModule):
         if self.use_simple_regression:
             self.model = self.backbone
             assert self.num_tasks == 1, "Simple regression only works with one dataloader and that can be FluorescenceData or Malinois_MPRA"
-            assert self.all_dataloaders[0].name in ["FluorescenceData", "MalinoisMPRA"], "Simple regression only works with one dataloader and that can be FluorescenceData or Malinois_MPRA"
+            assert self.all_dataloaders[0].name in ["Fluorescence", "MalinoisMPRA"], "Simple regression only works with one dataloader and that can be FluorescenceData or Malinois_MPRA"
 
         else:
             # create MTL model
