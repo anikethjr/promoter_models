@@ -654,7 +654,7 @@ def train_model(args, config, finetune=False):
                     print("{} Precision = {} ≈ {}".format(output, precision, np.around(precision, 4)))
                     print("{} Recall = {} ≈ {}".format(output, recall, np.around(recall, 4)))
                     print()
-            elif (("Fluorescence" in dl) or ("MalinoisMPRA" in dl)) and (("joint_" in name_format) or ("finetune_" in name_format) or ("linear_probing_" in name_format) or ("individual_" in name_format)):
+            elif (("Fluorescence" in dl) or ("MalinoisMPRA" in dl)) and (("joint_" in name_format) or ("finetune_" in name_format) or ("linear_probing_" in name_format) or ("individual_" in name_format) or ("simple_regression" in name_format)):
                 print()
                 for j, output in enumerate(all_dataloaders[i].output_names):
                     cur_y = dataloader_to_y[dl][:, j]
