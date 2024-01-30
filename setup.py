@@ -10,5 +10,6 @@ setuptools.setup(
                       "torch", "torchmtl", "lightning", \
                       "kipoiseq", "pyfaidx", "joblib", \
                       "transformers", "tensorly", "tensorly-torch", "odfpy", \
-                      "biopython", "einsum", "rotary-embedding-torch", "enformer-pytorch"]
+                      "biopython", "einsum", "rotary-embedding-torch", "enformer-pytorch", \
+                      "boda @ git+https://github.com/sjgosai/boda2.git", "cloudml-hypertune", "dmslogo==0.6.2"]
 )

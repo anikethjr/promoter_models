@@ -20,6 +20,9 @@ from lightning.pytorch.utilities.combined_loader import CombinedLoader
 
 import torchmtl
 
+import boda
+from boda.model.custom_layers import Conv1dNorm, LinearNorm, GroupedLinear, RepeatLayer, BranchedLinear
+
 from promoter_modelling.backbone_modules import *
 
 np.random.seed(97)
@@ -152,6 +155,14 @@ class MTLPredictor(L.LightningModule):
                                             'name': task.name,
                                             'layers': nn.Linear(self.backbone.embed_dims, task.num_outputs),
                                             'loss': task.loss_fn,
+                                            'loss_weight': torch.tensor(1.0),
+                                            'anchor_layer': 'Backbone'
+                                        })
+                elif model_class == Malinois: # Malinois has a GroupedLinear layer at the end
+                    model_config.append({
+                                            'name': task.name,
+                                            'layers': GroupedLinear(self.backbone.model.branched_channels, 1, task.num_outputs),
+                                            'loss': self.backbone.model.criterion,
                                             'loss_weight': torch.tensor(1.0),
                                             'anchor_layer': 'Backbone'
                                         })
@@ -652,6 +663,15 @@ class MTLPredictor(L.LightningModule):
             print("Using Adam lr = {}".format(self.lr))
             optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
             return optimizer
+        elif isinstance(self.backbone, Malinois):
+            print("Using Adam with amsgrad + CosineAnnealingWarmRestarts lr = {} weight_decay = {} beta1 = 0.8661062881299633 beta2 = 0.879223105336538 T_0 = 4096".format(self.lr, self.weight_decay))
+            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), 
+                                         lr=self.lr, weight_decay=self.weight_decay, 
+                                         betas=(0.8661062881299633, 0.879223105336538), amsgrad=True)
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 
+                                                                             T_0=4096)
+            scheduler = {"scheduler": scheduler, "interval": "step", "frequency": 1}
+            return [optimizer], [scheduler]
 
         print("Using AdamW lr = {} weight_decay = {}".format(self.lr, self.weight_decay))
         optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr, weight_decay=self.weight_decay)

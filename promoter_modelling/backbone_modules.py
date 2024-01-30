@@ -17,6 +17,8 @@ from enformer_pytorch import Enformer as BaseEnformer
 
 from tltorch import TRL
 
+import boda
+
 np.random.seed(97)
 torch.manual_seed(97)
 
@@ -51,11 +53,20 @@ def get_backbone_class(backbone_name):
         return LegNet
     elif backbone_name == "LegNetLarge":
         return LegNetLarge
+    elif backbone_name == "Malinois":
+        return Malinois
     else:
         raise ValueError("Backbone name not recognized")
     
 def get_all_backbone_names():
-    return ["MTLucifer", "MTLuciferWithResidualBlocks", "PureCNN", "PureCNNLarge", "ResNet", "MotifBasedFCN", "MotifBasedFCNLarge", "DNABERT", "Enformer", "EnformerFrozenBase", "EnformerFullFrozenBase", "EnformerRandomInit", "MPRAnn", "LegNet", "LegNetLarge"]
+    return ["MTLucifer", "MTLuciferWithResidualBlocks", 
+            "PureCNN", "PureCNNLarge", "ResNet", 
+            "MotifBasedFCN", "MotifBasedFCNLarge", 
+            "DNABERT", 
+            "Enformer", "EnformerFrozenBase", "EnformerFullFrozenBase", "EnformerRandomInit", 
+            "MPRAnn", 
+            "LegNet", "LegNetLarge", 
+            "Malinois"]
 
 
 class CNNBlock(nn.Module):
@@ -1056,3 +1067,32 @@ class LegNetLarge(nn.Module):
         # score = (x * self.bins).sum(dim=1)
         
         # return logprobs, score
+    
+class Malinois(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.model = boda.model.BassetBranched(
+            input_len=600,
+            n_outputs=3,
+            n_linear_layers=1,
+            linear_channels=1000,
+            linear_dropout_p = 0.11625456877954289,
+            n_branched_layers = 3,
+            branched_channels = 140,
+            branched_activation = "ReLU",
+            branched_dropout_p = 0.5757068086404574,
+            loss_criterion = "L1KLmixed",
+            loss_args={'beta': 5.0},
+        )
+    
+    def forward(self, x):
+        # x is of shape (batch_size, seqlen, 4). pad with zeros to (batch_size, 600, 4)
+        assert x.shape[1] <= 600, "sequence length must be less than or equal to 600 for Malinois"
+        pad_size = 600 - x.shape[1]
+        left_pad = pad_size // 2
+        right_pad = pad_size - left_pad
+        x = F.pad(x, (0, 0, left_pad, right_pad), mode='constant', value=0)
+        encoded = self.model.encode(x)
+        decoded = self.model.decode(encoded)
+        return decoded
