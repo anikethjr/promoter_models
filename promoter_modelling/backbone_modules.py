@@ -1072,7 +1072,7 @@ class Malinois(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.model = boda.model.BassetBranched(
+        self.model = BassetBranched(
             input_len=600,
             n_outputs=3,
             n_linear_layers=1,
