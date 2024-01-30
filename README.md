@@ -43,7 +43,14 @@ mamba deactivate
 mamba activate promoter_modelling
 ```
 
-Run the following command to install the package:
+To run the Malinois model, you will need to install the boda package before installing our package as follows:
+```
+git clone https://github.com/sjgosai/boda2.git
+cd boda2/
+pip install -e .
+``
+
+Run the following command to install our package:
 ```
 python -m pip install -e .
 ```
