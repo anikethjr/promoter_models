@@ -17,8 +17,9 @@ from enformer_pytorch import Enformer as BaseEnformer
 
 from tltorch import TRL
 
-from boda.model import BassetBranched
-from boda.model.custom_layers import Conv1dNorm, LinearNorm, GroupedLinear, RepeatLayer, BranchedLinear
+import boda
+# from boda.model import BassetBranched
+# from boda.model.custom_layers import Conv1dNorm, LinearNorm, GroupedLinear, RepeatLayer, BranchedLinear
 
 np.random.seed(97)
 torch.manual_seed(97)
@@ -1073,7 +1074,7 @@ class Malinois(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.model = BassetBranched(
+        self.model = boda.model.BassetBranched(
             input_len=600,
             n_outputs=3,
             n_linear_layers=1,

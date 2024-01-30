@@ -158,7 +158,7 @@ class MTLPredictor(L.LightningModule):
                 elif model_class == Malinois: # Malinois has a GroupedLinear layer at the end
                     model_config.append({
                                             'name': task.name,
-                                            'layers': GroupedLinear(self.backbone.model.branched_channels, 1, task.num_outputs),
+                                            'layers': boda.model.custom_layers.GroupedLinear(self.backbone.model.branched_channels, 1, task.num_outputs),
                                             'loss': self.backbone.model.criterion,
                                             'loss_weight': torch.tensor(1.0),
                                             'anchor_layer': 'Backbone'
