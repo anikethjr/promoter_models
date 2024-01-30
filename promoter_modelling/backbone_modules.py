@@ -17,7 +17,7 @@ from enformer_pytorch import Enformer as BaseEnformer
 
 from tltorch import TRL
 
-import boda
+from boda.model import BassetBranched
 
 np.random.seed(97)
 torch.manual_seed(97)
