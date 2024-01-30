@@ -18,6 +18,7 @@ from enformer_pytorch import Enformer as BaseEnformer
 from tltorch import TRL
 
 from boda.model import BassetBranched
+from boda.model.custom_layers import Conv1dNorm, LinearNorm, GroupedLinear, RepeatLayer, BranchedLinear
 
 np.random.seed(97)
 torch.manual_seed(97)

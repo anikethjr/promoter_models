@@ -21,7 +21,6 @@ from lightning.pytorch.utilities.combined_loader import CombinedLoader
 import torchmtl
 
 from promoter_modelling.backbone_modules import *
-from boda.model.custom_layers import Conv1dNorm, LinearNorm, GroupedLinear, RepeatLayer, BranchedLinear
 
 np.random.seed(97)
 torch.manual_seed(97)
