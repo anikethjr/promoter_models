@@ -1101,4 +1101,5 @@ class Malinois(nn.Module):
 
         encoded = self.model.encode(x)
         decoded = self.model.decode(encoded)
+        print(x.shape)
         return decoded
