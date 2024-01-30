@@ -116,7 +116,8 @@ class MTLPredictor(L.LightningModule):
         self.num_tasks = len(self.all_dataloader_modules)
         self.train_mode = train_mode
         self.mtldataloader = MTLDataLoader(self.all_dataloaders, self.train_mode)
-                
+        
+        self.model_class = model_class
         # do inputs include motif occurrences?
         self.with_motifs = with_motifs        
         if self.with_motifs:
@@ -375,7 +376,14 @@ class MTLPredictor(L.LightningModule):
             coeff = 1 / ((is_regression+1)*(std**2))
                         
             if self.all_dataloader_modules[i].with_mask:
-                loss += coeff * l_funcs[i](y_hat[i][mask], y[mask]) + torch.log(std)
+                if self.model_class == Malinois:
+                    for tn in range(self.all_dataloader_modules[i].num_outputs):
+                        this_mask = mask[:, tn]
+                        this_y_hat = y_hat[:, tn][this_mask].unsqueeze(1)
+                        this_y = y[:, tn][this_mask].unsqueeze(1)
+                        loss += l_funcs[i](this_y_hat, this_y) + torch.log(std)                        
+                else:
+                    loss += coeff * l_funcs[i](y_hat[i][mask], y[mask]) + torch.log(std)
             else:
                 if self.all_dataloader_modules[i].task == "classification" and self.all_dataloaders[i].use_1hot_for_classification:
                     s = 0
@@ -428,7 +436,18 @@ class MTLPredictor(L.LightningModule):
             coeff = 1 / ((is_regression+1)*(std**2))
 
             if self.all_dataloader_modules[dataloader_idx].with_mask:
-                loss = coeff * l_funcs[dataloader_idx](pred[mask], y[mask]) + torch.log(std)
+                if self.model_class == Malinois:
+                    loss = None
+                    for tn in range(self.all_dataloader_modules[dataloader_idx].num_outputs):
+                        this_mask = mask[:, tn]
+                        this_pred = pred[:, tn][this_mask].unsqueeze(1)
+                        this_y = y[:, tn][this_mask].unsqueeze(1)
+                        if loss is None:
+                            loss = l_funcs[dataloader_idx](this_pred, this_y) + torch.log(std)
+                        else:
+                            loss += l_funcs[dataloader_idx](this_pred, this_y) + torch.log(std)
+                else:
+                    loss = coeff * l_funcs[dataloader_idx](pred[mask], y[mask]) + torch.log(std)
             else:
                 if self.all_dataloader_modules[dataloader_idx].task == "classification" and self.all_dataloaders[dataloader_idx].use_1hot_for_classification:
                     s = 0
@@ -455,7 +474,18 @@ class MTLPredictor(L.LightningModule):
             coeff = 1 / ((is_regression+1)*(std**2))
             
             if self.all_dataloader_modules[dataloader_idx].with_mask:
-                loss = coeff * l_funcs[dataloader_idx](pred[mask], y[mask]) + torch.log(std)
+                if self.model_class == Malinois:
+                    loss = None
+                    for tn in range(self.all_dataloader_modules[dataloader_idx].num_outputs):
+                        this_mask = mask[:, tn]
+                        this_pred = pred[:, tn][this_mask].unsqueeze(1)
+                        this_y = y[:, tn][this_mask].unsqueeze(1)
+                        if loss is None:
+                            loss = l_funcs[dataloader_idx](this_pred, this_y) + torch.log(std)
+                        else:
+                            loss += l_funcs[dataloader_idx](this_pred, this_y) + torch.log(std)
+                else:
+                    loss = coeff * l_funcs[dataloader_idx](pred[mask], y[mask]) + torch.log(std)
             else:
                 if self.all_dataloader_modules[dataloader_idx].task == "classification" and self.all_dataloaders[dataloader_idx].use_1hot_for_classification:
                     s = 0
@@ -518,7 +548,18 @@ class MTLPredictor(L.LightningModule):
             coeff = 1 / ((is_regression+1)*(std**2))
 
             if self.all_dataloader_modules[dataloader_idx].with_mask:
-                loss = coeff * l_funcs[dataloader_idx](pred[mask], y[mask]) + torch.log(std)
+                if self.model_class == Malinois:
+                    loss = None
+                    for tn in range(self.all_dataloader_modules[dataloader_idx].num_outputs):
+                        this_mask = mask[:, tn]
+                        this_pred = pred[:, tn][this_mask].unsqueeze(1)
+                        this_y = y[:, tn][this_mask].unsqueeze(1)
+                        if loss is None:
+                            loss = l_funcs[dataloader_idx](this_pred, this_y) + torch.log(std)
+                        else:
+                            loss += l_funcs[dataloader_idx](this_pred, this_y) + torch.log(std)
+                else:
+                    loss = coeff * l_funcs[dataloader_idx](pred[mask], y[mask]) + torch.log(std)
             else:
                 if self.all_dataloader_modules[dataloader_idx].task == "classification" and self.all_dataloaders[dataloader_idx].use_1hot_for_classification:
                     s = 0
@@ -545,7 +586,18 @@ class MTLPredictor(L.LightningModule):
             coeff = 1 / ((is_regression+1)*(std**2))
             
             if self.all_dataloader_modules[dataloader_idx].with_mask:
-                loss = coeff * l_funcs[dataloader_idx](pred[mask], y[mask]) + torch.log(std)
+                if self.model_class == Malinois:
+                    loss = None
+                    for tn in range(self.all_dataloader_modules[dataloader_idx].num_outputs):
+                        this_mask = mask[:, tn]
+                        this_pred = pred[:, tn][this_mask].unsqueeze(1)
+                        this_y = y[:, tn][this_mask].unsqueeze(1)
+                        if loss is None:
+                            loss = l_funcs[dataloader_idx](this_pred, this_y) + torch.log(std)
+                        else:
+                            loss += l_funcs[dataloader_idx](this_pred, this_y) + torch.log(std)
+                else:
+                    loss = coeff * l_funcs[dataloader_idx](pred[mask], y[mask]) + torch.log(std)
             else:
                 if self.all_dataloader_modules[dataloader_idx].task == "classification" and self.all_dataloaders[dataloader_idx].use_1hot_for_classification:
                     s = 0
