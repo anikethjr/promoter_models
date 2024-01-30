@@ -1071,12 +1071,12 @@ class LegNetLarge(nn.Module):
         # return logprobs, score
     
 class Malinois(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, n_outputs) -> None:
         super().__init__()
 
         self.model = boda.model.BassetBranched(
             input_len=600,
-            n_outputs=3,
+            n_outputs=n_outputs,
             n_linear_layers=1,
             linear_channels=1000,
             linear_dropout_p = 0.11625456877954289,

@@ -122,6 +122,9 @@ class MTLPredictor(L.LightningModule):
         if self.with_motifs:
             self.num_motifs = self.all_dataloaders[0].num_motifs
             self.backbone = model_class(num_motifs=self.num_motifs)
+        elif model_class == Malinois:
+            assert self.num_tasks == 1, "Malinois only works with one dataloader"
+            self.backbone = model_class(num_outputs=self.all_dataloaders[0].num_outputs)
         else:
             self.backbone = model_class()
         
