@@ -1095,6 +1095,10 @@ class Malinois(nn.Module):
         left_pad = pad_size // 2
         right_pad = pad_size - left_pad
         x = F.pad(x, (0, 0, left_pad, right_pad), mode='constant', value=0)
+
+        x = x.permute(0, 2, 1) # (batch_size, 4, 600)
+        print(x.shape)
+
         encoded = self.model.encode(x)
         decoded = self.model.decode(encoded)
         return decoded
