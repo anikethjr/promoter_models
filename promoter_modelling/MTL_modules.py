@@ -287,7 +287,7 @@ class MTLPredictor(L.LightningModule):
                         n_jobs = 1
 
                     predictor = Pipeline((("standard_scaler", StandardScaler()),
-                                          ("lasso", GridSearchCV(linear_model.Lasso(random_state=97, max_iter=10000),
+                                          ("lasso", GridSearchCV(linear_model.Lasso(random_state=97, max_iter=1000),
                                                                  param_grid,
                                                                  cv=ps,
                                                                  n_jobs=n_jobs))))
