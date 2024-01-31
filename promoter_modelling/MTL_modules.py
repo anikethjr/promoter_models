@@ -715,7 +715,7 @@ class MTLPredictor(L.LightningModule):
             print("Using Adam lr = {}".format(self.lr))
             optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
             return optimizer
-        elif isinstance(self.backbone, Malinois):
+        elif isinstance(self.backbone, Malinois) and self.all_dataloaders[0].name.startswith("MalinoisMPRA"):
             print("Using Adam with amsgrad + CosineAnnealingWarmRestarts lr = {} weight_decay = {} beta1 = 0.8661062881299633 beta2 = 0.879223105336538 T_0 = 4096".format(self.lr, self.weight_decay))
             optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), 
                                          lr=self.lr, weight_decay=self.weight_decay, 
