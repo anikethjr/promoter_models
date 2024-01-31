@@ -41,6 +41,8 @@ def get_backbone_class(backbone_name):
         return MotifBasedFCNLarge
     elif backbone_name == "DNABERT":
         return DNABERT
+    elif backbone_name == "DNABERTRandomInit":
+        return DNABERTRandomInit
     elif backbone_name == "Enformer":
         return Enformer
     elif backbone_name == "EnformerFrozenBase":
@@ -64,7 +66,7 @@ def get_all_backbone_names():
     return ["MTLucifer", "MTLuciferWithResidualBlocks", 
             "PureCNN", "PureCNNLarge", "ResNet", 
             "MotifBasedFCN", "MotifBasedFCNLarge", 
-            "DNABERT", 
+            "DNABERT", "DNABERTRandomInit",
             "Enformer", "EnformerFrozenBase", "EnformerFullFrozenBase", "EnformerRandomInit", 
             "MPRAnn", 
             "LegNet", "LegNetLarge", 
