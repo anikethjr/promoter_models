@@ -404,6 +404,18 @@ class DNABERT(nn.Module):
         outs = self.model(seq)
         return outs.pooler_output
     
+class DNABERTRandomInit(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = AutoModel.from_pretrained("zhihan1996/DNA_bert_6")
+        # reset all weights
+        self.model.apply(self.model._init_weights)
+        self.embed_dims = self.model.config.hidden_size
+    
+    def forward(self, seq):
+        outs = self.model(seq)
+        return outs.pooler_output
+    
 class Enformer(nn.Module):
     def __init__(self):
         super().__init__()
