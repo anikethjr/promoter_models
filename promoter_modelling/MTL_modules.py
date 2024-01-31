@@ -379,7 +379,7 @@ class MTLPredictor(L.LightningModule):
                 if self.model_class == Malinois:
                     for tn in range(self.all_dataloader_modules[i].num_outputs):
                         this_mask = mask[:, tn]
-                        this_y_hat = y_hat[:, tn][this_mask].unsqueeze(1)
+                        this_y_hat = y_hat[i][:, tn][this_mask].unsqueeze(1)
                         this_y = y[:, tn][this_mask].unsqueeze(1)
                         loss += l_funcs[i](this_y_hat, this_y) + torch.log(std)                        
                 else:
