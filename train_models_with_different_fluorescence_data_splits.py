@@ -1000,8 +1000,8 @@ def train_model(args, config, finetune=False):
                     all_seeds_replicate_concordance_pearsonr[output] = []
                     all_seeds_replicate_concordance_srho[output] = []
 
-                all_seeds_extreme_expression_promoters_pearsonr[output].append(pearsonr)
-                all_seeds_extreme_expression_promoters_srho[output].append(srho)
+                all_seeds_replicate_concordance_pearsonr[output].append(pearsonr)
+                all_seeds_replicate_concordance_srho[output].append(srho)
 
                 # plot replicate 1 vs 2
                 sns.scatterplot(x=replicate1, y=replicate2, ax=axs[j], alpha=0.5)
