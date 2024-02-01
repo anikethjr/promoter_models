@@ -718,7 +718,7 @@ def train_model(args, config, finetune=False):
                     cur_pred = dataloader_to_pred[dl][:, j]
                     if np.isnan(cur_pred).any():
                         print("WARNING: Nans in pred, replacing with 0")
-                        cur_pred = np.nan_to_num(cur_pred)
+                        cur_pred = torch.tensor(np.nan_to_num(cur_pred))
 
                     # apply sigmoid and round
                     cur_pred = torch.sigmoid(cur_pred)
