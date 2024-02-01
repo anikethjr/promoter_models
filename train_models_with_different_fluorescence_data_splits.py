@@ -715,7 +715,7 @@ def train_model(args, config, finetune=False):
                 print()
                 for j, output in enumerate(all_dataloaders[i].output_names):
                     cur_y = dataloader_to_y[dl][:, j]
-                    cur_pred = dataloader_to_pred[dl][:, j]
+                    cur_pred = np.nan_to_num(dataloader_to_pred[dl][:, j])
 
                     # apply sigmoid and round
                     cur_pred = torch.sigmoid(cur_pred)
