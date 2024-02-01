@@ -1190,28 +1190,29 @@ def train_model(args, config, finetune=False):
             summary[output + "_avg_PearsonR_disp"] = "{} +- {}".format(np.around(pearsonr, 4), np.around(pearsonr_std, 4))
             summary[output + "_avg_SpearmanR_disp"] = "{} +- {}".format(np.around(srho, 4), np.around(srho_std, 4))
         
-        for output in all_seeds_replicate_concordance_srho:
-            srho = np.average(all_seeds_replicate_concordance_srho[output])
-            pearsonr = np.average(all_seeds_replicate_concordance_pearsonr[output])
-            
-            srho_std = np.std(all_seeds_replicate_concordance_srho[output])
-            pearsonr_std = np.std(all_seeds_replicate_concordance_pearsonr[output])
-            
-            print("{} avg Replicate Concordance PearsonR = {} +- {} ≈ {} +- {}".format(output, pearsonr, pearsonr_std, np.around(pearsonr, 4), np.around(pearsonr_std, 4)))
-            print("{} avg Replicate Concordance Spearman rho = {} +- {} ≈ {} +- {}".format(output, srho, srho_std, np.around(srho, 4), np.around(srho_std, 4)))
-            print()
-            
-            summary[output + "_all_ReplicateConcordancePearsonR"] = all_seeds_replicate_concordance_pearsonr[output]
-            summary[output + "_all_ReplicateConcordanceSpearmanR"] = all_seeds_replicate_concordance_srho[output]
-            
-            summary[output + "_avg_ReplicateConcordancePearsonR"] = pearsonr
-            summary[output + "_avg_ReplicateConcordanceSpearmanR"] = srho
-            
-            summary[output + "_std_ReplicateConcordancePearsonR"] = pearsonr_std
-            summary[output + "_std_ReplicateConcordanceSpearmanR"] = srho_std
-            
-            summary[output + "_avg_ReplicateConcordancePearsonR_disp"] = "{} +- {}".format(np.around(pearsonr, 4), np.around(pearsonr_std, 4))
-            summary[output + "_avg_ReplicateConcordanceSpearmanR_disp"] = "{} +- {}".format(np.around(srho, 4), np.around(srho_std, 4))
+        if "FluorescenceData" in dataloaders:
+            for output in all_seeds_replicate_concordance_srho:
+                srho = np.average(all_seeds_replicate_concordance_srho[output])
+                pearsonr = np.average(all_seeds_replicate_concordance_pearsonr[output])
+                
+                srho_std = np.std(all_seeds_replicate_concordance_srho[output])
+                pearsonr_std = np.std(all_seeds_replicate_concordance_pearsonr[output])
+                
+                print("{} avg Replicate Concordance PearsonR = {} +- {} ≈ {} +- {}".format(output, pearsonr, pearsonr_std, np.around(pearsonr, 4), np.around(pearsonr_std, 4)))
+                print("{} avg Replicate Concordance Spearman rho = {} +- {} ≈ {} +- {}".format(output, srho, srho_std, np.around(srho, 4), np.around(srho_std, 4)))
+                print()
+                
+                summary[output + "_all_ReplicateConcordancePearsonR"] = all_seeds_replicate_concordance_pearsonr[output]
+                summary[output + "_all_ReplicateConcordanceSpearmanR"] = all_seeds_replicate_concordance_srho[output]
+                
+                summary[output + "_avg_ReplicateConcordancePearsonR"] = pearsonr
+                summary[output + "_avg_ReplicateConcordanceSpearmanR"] = srho
+                
+                summary[output + "_std_ReplicateConcordancePearsonR"] = pearsonr_std
+                summary[output + "_std_ReplicateConcordanceSpearmanR"] = srho_std
+                
+                summary[output + "_avg_ReplicateConcordancePearsonR_disp"] = "{} +- {}".format(np.around(pearsonr, 4), np.around(pearsonr_std, 4))
+                summary[output + "_avg_ReplicateConcordanceSpearmanR_disp"] = "{} +- {}".format(np.around(srho, 4), np.around(srho_std, 4))
         
         # save summary
         with open(os.path.join(summaries_save_dir, name_format + "_dlseed.json"), "w") as f:
