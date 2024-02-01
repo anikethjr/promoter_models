@@ -9,6 +9,8 @@ import json
 from tqdm import tqdm
 import scipy.stats as stats
 from sklearn.metrics import r2_score, accuracy_score, precision_score, recall_score, f1_score
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 import torch
 
@@ -413,6 +415,24 @@ def train_model(args, config, finetune=False):
     all_seeds_pearsonr = {}
     all_seeds_srho = {}
 
+    percentile_threshold_for_highly_expressed_promoters = 90
+    percentile_threshold_for_lowly_expressed_promoters = 100 - percentile_threshold_for_highly_expressed_promoters
+
+    all_seeds_highly_expressed_promoters_r2 = {}
+    all_seeds_highly_expressed_promoters_pearsonr = {}
+    all_seeds_highly_expressed_promoters_srho = {}
+
+    all_seeds_lowly_expressed_promoters_r2 = {}
+    all_seeds_lowly_expressed_promoters_pearsonr = {}
+    all_seeds_lowly_expressed_promoters_srho = {}
+
+    all_seeds_extreme_expression_promoters_r2 = {}
+    all_seeds_extreme_expression_promoters_pearsonr = {}
+    all_seeds_extreme_expression_promoters_srho = {}
+
+    all_seeds_y = {}
+    all_seeds_pred = {}
+
     all_seeds_accuracy = {}
     all_seeds_precision = {}
     all_seeds_recall = {}
@@ -424,6 +444,9 @@ def train_model(args, config, finetune=False):
     all_seeds_highly_expressed_recall = {}
     all_seeds_highly_expressed_f1 = {}
     all_seeds_lowly_expressed_accuracy = {}
+
+    best_seed = None
+    best_seed_val_metric = None
 
     for seed in range(num_models_to_train):
         if num_models_to_train > 1:
@@ -788,15 +811,257 @@ def train_model(args, config, finetune=False):
                     print("{} Spearman rho = {} ≈ {}".format(output, srho, np.around(srho, 4)))
                     print()
                     
+                    # get highly expressed promoter metrics
+                    highly_expressed_promoters = cur_y > np.percentile(cur_y, percentile_threshold_for_highly_expressed_promoters)
+                    cur_y_highly_expressed_promoters = cur_y[highly_expressed_promoters]
+                    cur_pred_highly_expressed_promoters = cur_pred[highly_expressed_promoters]
+                    highly_expressed_promoters_r2 = r2_score(cur_y_highly_expressed_promoters, cur_pred_highly_expressed_promoters)
+                    highly_expressed_promoters_pearsonr = stats.pearsonr(cur_y_highly_expressed_promoters, cur_pred_highly_expressed_promoters)[0]
+                    highly_expressed_promoters_srho = stats.spearmanr(cur_y_highly_expressed_promoters, cur_pred_highly_expressed_promoters).correlation
+
+                    print("{} R2 (highly expressed promoters) = {} ≈ {}".format(output, highly_expressed_promoters_r2, np.around(highly_expressed_promoters_r2, 4)))
+                    print("{} PearsonR (highly expressed promoters) = {} ≈ {}".format(output, highly_expressed_promoters_pearsonr, np.around(highly_expressed_promoters_pearsonr, 4)))
+                    print("{} Spearman rho (highly expressed promoters) = {} ≈ {}".format(output, highly_expressed_promoters_srho, np.around(highly_expressed_promoters_srho, 4)))
+                    print()
+
+                    # get lowly expressed promoter metrics
+                    lowly_expressed_promoters = cur_y < np.percentile(cur_y, percentile_threshold_for_lowly_expressed_promoters)
+                    cur_y_lowly_expressed_promoters = cur_y[lowly_expressed_promoters]
+                    cur_pred_lowly_expressed_promoters = cur_pred[lowly_expressed_promoters]
+                    lowly_expressed_promoters_r2 = r2_score(cur_y_lowly_expressed_promoters, cur_pred_lowly_expressed_promoters)
+                    lowly_expressed_promoters_pearsonr = stats.pearsonr(cur_y_lowly_expressed_promoters, cur_pred_lowly_expressed_promoters)[0]
+                    lowly_expressed_promoters_srho = stats.spearmanr(cur_y_lowly_expressed_promoters, cur_pred_lowly_expressed_promoters).correlation
+
+                    print("{} R2 (lowly expressed promoters) = {} ≈ {}".format(output, lowly_expressed_promoters_r2, np.around(lowly_expressed_promoters_r2, 4)))
+                    print("{} PearsonR (lowly expressed promoters) = {} ≈ {}".format(output, lowly_expressed_promoters_pearsonr, np.around(lowly_expressed_promoters_pearsonr, 4)))
+                    print("{} Spearman rho (lowly expressed promoters) = {} ≈ {}".format(output, lowly_expressed_promoters_srho, np.around(lowly_expressed_promoters_srho, 4)))
+                    print()
+
+                    # get extreme expression promoter (= highly + lowly expressed) metrics
+                    extreme_expression_promoters = np.logical_or(highly_expressed_promoters, lowly_expressed_promoters)
+                    cur_y_extreme_expression_promoters = cur_y[extreme_expression_promoters]
+                    cur_pred_extreme_expression_promoters = cur_pred[extreme_expression_promoters]
+                    extreme_expression_promoters_r2 = r2_score(cur_y_extreme_expression_promoters, cur_pred_extreme_expression_promoters)
+                    extreme_expression_promoters_pearsonr = stats.pearsonr(cur_y_extreme_expression_promoters, cur_pred_extreme_expression_promoters)[0]
+                    extreme_expression_promoters_srho = stats.spearmanr(cur_y_extreme_expression_promoters, cur_pred_extreme_expression_promoters).correlation
+
+                    print("{} R2 (extreme expression promoters) = {} ≈ {}".format(output, extreme_expression_promoters_r2, np.around(extreme_expression_promoters_r2, 4)))
+                    print("{} PearsonR (extreme expression promoters) = {} ≈ {}".format(output, extreme_expression_promoters_pearsonr, np.around(extreme_expression_promoters_pearsonr, 4)))
+                    print("{} Spearman rho (extreme expression promoters) = {} ≈ {}".format(output, extreme_expression_promoters_srho, np.around(extreme_expression_promoters_srho, 4)))
+                    print()
+                    
                     if output not in all_seeds_r2:
                         all_seeds_r2[output] = []
                         all_seeds_pearsonr[output] = []
                         all_seeds_srho[output] = []
+
+                        all_seeds_highly_expressed_promoters_r2[output] = []
+                        all_seeds_highly_expressed_promoters_pearsonr[output] = []
+                        all_seeds_highly_expressed_promoters_srho[output] = []
+
+                        all_seeds_lowly_expressed_promoters_r2[output] = []
+                        all_seeds_lowly_expressed_promoters_pearsonr[output] = []
+                        all_seeds_lowly_expressed_promoters_srho[output] = []
+
+                        all_seeds_extreme_expression_promoters_r2[output] = []
+                        all_seeds_extreme_expression_promoters_pearsonr[output] = []
+                        all_seeds_extreme_expression_promoters_srho[output] = []
+
+                        all_seeds_y[output] = []
+                        all_seeds_pred[output] = []
                         
                     all_seeds_r2[output].append(r2)
                     all_seeds_pearsonr[output].append(pearsonr)
                     all_seeds_srho[output].append(srho)
+
+                    all_seeds_highly_expressed_promoters_r2[output].append(highly_expressed_promoters_r2)
+                    all_seeds_highly_expressed_promoters_pearsonr[output].append(highly_expressed_promoters_pearsonr)
+                    all_seeds_highly_expressed_promoters_srho[output].append(highly_expressed_promoters_srho)
+
+                    all_seeds_lowly_expressed_promoters_r2[output].append(lowly_expressed_promoters_r2)
+                    all_seeds_lowly_expressed_promoters_pearsonr[output].append(lowly_expressed_promoters_pearsonr)
+                    all_seeds_lowly_expressed_promoters_srho[output].append(lowly_expressed_promoters_srho)
+
+                    all_seeds_extreme_expression_promoters_r2[output].append(extreme_expression_promoters_r2)
+                    all_seeds_extreme_expression_promoters_pearsonr[output].append(extreme_expression_promoters_pearsonr)
+                    all_seeds_extreme_expression_promoters_srho[output].append(extreme_expression_promoters_srho)
+
+                    all_seeds_y[output].append(cur_y)
+                    all_seeds_pred[output].append(cur_pred)
+
+                    if best_seed_val_metric is None:
+                        best_seed_val_metric = srho
+                        best_seed = seed
+                    elif srho > best_seed_val_metric:
+                        best_seed_val_metric = srho
+                        best_seed = seed
+            
+            all_dataloaders[i].update_metrics(dataloader_to_pred[dl], dataloader_to_y[dl], 0, "test")
+            metrics_dict = all_dataloaders[i].compute_metrics("test")
+
+            # print metrics for this dataloader
+            for key in metrics_dict:
+                if "loss" in key:
+                    continue
+                print("{} = {} ≈ {}".format(key, metrics_dict[key], np.around(metrics_dict[key], 4)))
     
+    # compute and plot replicate concordance for fluorescence data
+    if "FluorescenceData" in dataloaders:
+        all_seeds_replicate_concordance_srho = {}
+        all_seeds_replicate_concordance_pearsonr = {}
+
+        for seed in range(num_models_to_train):
+            if num_models_to_train > 1:
+                print("Random seed = {}".format(seed))
+                # set random seed
+                np.random.seed(seed)
+                torch.manual_seed(seed)
+
+                fluorescence_dl_index = None
+                for i in range(len(all_dataloaders)):
+                    if all_dataloaders[i].name.startswith("Fluorescence"):
+                        fluorescence_dl_index = i
+                        if args.model_name.startswith("MotifBased"):
+                            if all_dataloaders[i].predict_DE:
+                                all_dataloaders[i] = FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                    cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs_DE"), \
+                                                                                    seed=seed, \
+                                                                                    return_specified_cells=all_dataloaders[i].return_specified_cells, \
+                                                                                    predict_DE=True)
+                            else:
+                                all_dataloaders[i] = FluorescenceData_with_motifs.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_with_motifs"), \
+                                                                                        seed=seed, \
+                                                                                        return_specified_cells=all_dataloaders[i].return_specified_cells)
+                        elif "DNABERT" in args.model_name:
+                            if all_dataloaders[i].predict_DE:
+                                all_dataloaders[i] = FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT_DE"), \
+                                                                                        seed=seed, \
+                                                                                        return_specified_cells=all_dataloaders[i].return_specified_cells, \
+                                                                                        predict_DE=True)
+                            else:
+                                all_dataloaders[i] = FluorescenceData_DNABERT.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DNABERT"), \
+                                                                                        seed=seed, \
+                                                                                        return_specified_cells=all_dataloaders[i].return_specified_cells)
+                        elif (args.modelling_strategy == "pretrain+simple_regression" and finetune) or (args.modelling_strategy == "single_task_simple_regression"):
+                            if all_dataloaders[i].predict_DE:
+                                all_dataloaders[i] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
+                                                                                        seed=seed, \
+                                                                                        return_specified_cells=all_dataloaders[i].return_specified_cells, \
+                                                                                        use_construct=True, \
+                                                                                        predict_DE=True)
+                            else:
+                                all_dataloaders[i] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
+                                                                                        seed=seed, \
+                                                                                        return_specified_cells=all_dataloaders[i].return_specified_cells, \
+                                                                                        use_construct=True)
+                        elif "classification" in all_dataloaders[i].name:
+                            if all_dataloaders[i].predict_DE:
+                                all_dataloaders[i] = FluorescenceData_classification.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification"), \
+                                                                                        seed=seed, \
+                                                                                        return_specified_cells=all_dataloaders[i].return_specified_cells, \
+                                                                                        predict_DE=True)
+                            else:
+                                all_dataloaders[i] = FluorescenceData_classification.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification"), \
+                                                                                        seed=seed, \
+                                                                                        return_specified_cells=all_dataloaders[i].return_specified_cells)
+                        else:
+                            if all_dataloaders[i].predict_DE:
+                                all_dataloaders[i] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData_DE"), \
+                                                                                        seed=seed, \
+                                                                                        return_specified_cells=all_dataloaders[i].return_specified_cells, \
+                                                                                        predict_DE=True)
+                            else:
+                                all_dataloaders[i] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
+                                                                                        cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
+                                                                                        seed=seed, \
+                                                                                        return_specified_cells=all_dataloaders[i].return_specified_cells)
+
+            fd = all_dataloaders[fluorescence_dl_index]
+
+            # first only for test set
+            fig, axs = plt.subplots(1, len(fd.output_names), figsize=(len(fd.output_names) * 6, 5))
+            for j, output in enumerate(fd.output_names):
+                first_letter_of_cell_name = output[:1]
+                replicate1 = np.log2((fd.test_set["{}{}_P4".format(first_letter_of_cell_name, 1)] + 1) / (fd.test_set["{}{}_P7".format(first_letter_of_cell_name, 1)] + 1))
+                replicate2 = np.log2((fd.test_set["{}{}_P4".format(first_letter_of_cell_name, 2)] + 1) / (fd.test_set["{}{}_P7".format(first_letter_of_cell_name, 2)] + 1))
+
+                pearsonr = stats.pearsonr(replicate1, replicate2)[0]
+                srho = stats.spearmanr(replicate1, replicate2).correlation
+
+                if output not in all_seeds_replicate_concordance_pearsonr:
+                    all_seeds_replicate_concordance_pearsonr[output] = []
+                    all_seeds_replicate_concordance_srho[output] = []
+
+                all_seeds_extreme_expression_promoters_pearsonr[output].append(pearsonr)
+                all_seeds_extreme_expression_promoters_srho[output].append(srho)
+
+                # plot replicate 1 vs 2
+                sns.scatterplot(x=replicate1, y=replicate2, ax=axs[j], alpha=0.5)
+
+                # draw line of best fit
+                m, b = np.polyfit(replicate1, replicate2, 1)
+                axs[j].plot(replicate1, m*replicate1 + b, color="red", label="Best fit line")
+
+                # draw line of perfect fit
+                axs[j].plot(replicate1, replicate1, color="black", label="x=y")
+
+                # set labels
+                axs[j].set_xlabel("Replicate 1")
+                axs[j].set_ylabel("Replicate 2")
+
+                # set title
+                axs[j].set_title(r"{} ($r$ = {:.4f}, $\rho$ = {:.4f})".format(output, pearsonr, srho))
+
+                # set legend
+                axs[j].legend()
+
+            # set suptitle and save figure
+            fig.suptitle("Replicate concordance for test set with dl_seed {} (number of samples = {})".format(seed, replicate1.shape[0]))
+            fig.savefig(os.path.join(summaries_save_dir, name_format + f"_replicate_concordance_dl_seed_{seed}.png"), bbox_inches="tight")
+
+            # next for all samples
+            if seed == 0:
+                fig, axs = plt.subplots(1, len(fd.output_names), figsize=(len(fd.output_names) * 6, 5))
+                for j, output in enumerate(fd.output_names):
+                    first_letter_of_cell_name = output[:1]
+                    replicate1 = np.log2((fd.merged["{}{}_P4".format(first_letter_of_cell_name, 1)] + 1) / (fd.merged["{}{}_P7".format(first_letter_of_cell_name, 1)] + 1))
+                    replicate2 = np.log2((fd.merged["{}{}_P4".format(first_letter_of_cell_name, 2)] + 1) / (fd.merged["{}{}_P7".format(first_letter_of_cell_name, 2)] + 1))
+
+                    pearsonr = stats.pearsonr(replicate1, replicate2)[0]
+                    srho = stats.spearmanr(replicate1, replicate2).correlation
+
+                    # plot replicate 1 vs 2
+                    sns.scatterplot(x=replicate1, y=replicate2, ax=axs[j], alpha=0.5)
+
+                    # draw line of best fit
+                    m, b = np.polyfit(replicate1, replicate2, 1)
+                    axs[j].plot(replicate1, m*replicate1 + b, color="red", label="Best fit line")
+
+                    # draw line of perfect fit
+                    axs[j].plot(replicate1, replicate1, color="black", label="x=y")
+
+                    # set labels
+                    axs[j].set_xlabel("Replicate 1")
+                    axs[j].set_ylabel("Replicate 2")
+
+                    # set title
+                    axs[j].set_title(r"{} ($r$ = {:.4f}, $\rho$ = {:.4f})".format(output, pearsonr, srho))
+
+                    # set legend
+                    axs[j].legend()
+
+                # set suptitle and save figure
+                fig.suptitle("Replicate concordance across all {} samples".format(replicate1.shape[0]))
+                fig.savefig(os.path.join(summaries_save_dir, name_format + "_replicate_concordance_all_samples.png"), bbox_inches="tight")
+
     print()
     if len(all_seeds_r2) > 0 or len(all_seeds_accuracy) > 0:
         print("FINAL RESULTS ON FLUORESCENCE DATA")
@@ -921,6 +1186,29 @@ def train_model(args, config, finetune=False):
             summary[output + "_avg_R2_disp"] = "{} +- {}".format(np.around(r2, 4), np.around(r2_std, 4))
             summary[output + "_avg_PearsonR_disp"] = "{} +- {}".format(np.around(pearsonr, 4), np.around(pearsonr_std, 4))
             summary[output + "_avg_SpearmanR_disp"] = "{} +- {}".format(np.around(srho, 4), np.around(srho_std, 4))
+        
+        for output in all_seeds_replicate_concordance_srho:
+            srho = np.average(all_seeds_replicate_concordance_srho[output])
+            pearsonr = np.average(all_seeds_replicate_concordance_pearsonr[output])
+            
+            srho_std = np.std(all_seeds_replicate_concordance_srho[output])
+            pearsonr_std = np.std(all_seeds_replicate_concordance_pearsonr[output])
+            
+            print("{} avg Replicate Concordance PearsonR = {} +- {} ≈ {} +- {}".format(output, pearsonr, pearsonr_std, np.around(pearsonr, 4), np.around(pearsonr_std, 4)))
+            print("{} avg Replicate Concordance Spearman rho = {} +- {} ≈ {} +- {}".format(output, srho, srho_std, np.around(srho, 4), np.around(srho_std, 4)))
+            print()
+            
+            summary[output + "_all_ReplicateConcordancePearsonR"] = all_seeds_replicate_concordance_pearsonr[output]
+            summary[output + "_all_ReplicateConcordanceSpearmanR"] = all_seeds_replicate_concordance_srho[output]
+            
+            summary[output + "_avg_ReplicateConcordancePearsonR"] = pearsonr
+            summary[output + "_avg_ReplicateConcordanceSpearmanR"] = srho
+            
+            summary[output + "_std_ReplicateConcordancePearsonR"] = pearsonr_std
+            summary[output + "_std_ReplicateConcordanceSpearmanR"] = srho_std
+            
+            summary[output + "_avg_ReplicateConcordancePearsonR_disp"] = "{} +- {}".format(np.around(pearsonr, 4), np.around(pearsonr_std, 4))
+            summary[output + "_avg_ReplicateConcordanceSpearmanR_disp"] = "{} +- {}".format(np.around(srho, 4), np.around(srho_std, 4))
         
         # save summary
         with open(os.path.join(summaries_save_dir, name_format + "_dlseed.json"), "w") as f:
