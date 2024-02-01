@@ -990,8 +990,8 @@ def train_model(args, config, finetune=False):
             fig, axs = plt.subplots(1, len(fd.output_names), figsize=(len(fd.output_names) * 6, 5))
             for j, output in enumerate(fd.output_names):
                 first_letter_of_cell_name = output[:1]
-                replicate1 = np.log2((fd.test_set["{}{}_P4".format(first_letter_of_cell_name, 1)] + 1) / (fd.test_set["{}{}_P7".format(first_letter_of_cell_name, 1)] + 1))
-                replicate2 = np.log2((fd.test_set["{}{}_P4".format(first_letter_of_cell_name, 2)] + 1) / (fd.test_set["{}{}_P7".format(first_letter_of_cell_name, 2)] + 1))
+                replicate1 = np.log2((fd.test_set["{}{}_P4".format(first_letter_of_cell_name, 1)]) / (fd.test_set["{}{}_P7".format(first_letter_of_cell_name, 1)]))
+                replicate2 = np.log2((fd.test_set["{}{}_P4".format(first_letter_of_cell_name, 2)]) / (fd.test_set["{}{}_P7".format(first_letter_of_cell_name, 2)]))
 
                 pearsonr = stats.pearsonr(replicate1, replicate2)[0]
                 srho = stats.spearmanr(replicate1, replicate2).correlation
@@ -1032,8 +1032,8 @@ def train_model(args, config, finetune=False):
                 fig, axs = plt.subplots(1, len(fd.output_names), figsize=(len(fd.output_names) * 6, 5))
                 for j, output in enumerate(fd.output_names):
                     first_letter_of_cell_name = output[:1]
-                    replicate1 = np.log2((fd.merged["{}{}_P4".format(first_letter_of_cell_name, 1)] + 1) / (fd.merged["{}{}_P7".format(first_letter_of_cell_name, 1)] + 1))
-                    replicate2 = np.log2((fd.merged["{}{}_P4".format(first_letter_of_cell_name, 2)] + 1) / (fd.merged["{}{}_P7".format(first_letter_of_cell_name, 2)] + 1))
+                    replicate1 = np.log2((fd.merged["{}{}_P4".format(first_letter_of_cell_name, 1)]) / (fd.merged["{}{}_P7".format(first_letter_of_cell_name, 1)]))
+                    replicate2 = np.log2((fd.merged["{}{}_P4".format(first_letter_of_cell_name, 2)]) / (fd.merged["{}{}_P7".format(first_letter_of_cell_name, 2)]))
 
                     pearsonr = stats.pearsonr(replicate1, replicate2)[0]
                     srho = stats.spearmanr(replicate1, replicate2).correlation
