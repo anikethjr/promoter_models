@@ -13,46 +13,85 @@ import einops
 from rotary_embedding_torch import RotaryEmbedding
 
 from transformers import AutoTokenizer, AutoModel
+from enformer_pytorch import Enformer as BaseEnformer
 
 from tltorch import TRL
+
+import boda
+# from boda.model import BassetBranched
+# from boda.model.custom_layers import Conv1dNorm, LinearNorm, GroupedLinear, RepeatLayer, BranchedLinear
 
 np.random.seed(97)
 torch.manual_seed(97)
 
-class CNNBlockGN(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=1, dilation=1, bias=False, gn_num_groups=16):
+def get_backbone_class(backbone_name):
+    if backbone_name == "MTLucifer":
+        return MTLucifer
+    elif backbone_name == "MTLuciferWithResidualBlocks":
+        return MTLuciferWithResidualBlocks
+    elif backbone_name == "PureCNN":
+        return PureCNN
+    elif backbone_name == "PureCNNLarge":
+        return PureCNNLarge
+    elif backbone_name == "ResNet":
+        return ResNet
+    elif backbone_name == "MotifBasedFCN":
+        return MotifBasedFCN
+    elif backbone_name == "MotifBasedFCNLarge":
+        return MotifBasedFCNLarge
+    elif backbone_name == "DNABERT":
+        return DNABERT
+    elif backbone_name == "DNABERTRandomInit":
+        return DNABERTRandomInit
+    elif backbone_name == "Enformer":
+        return Enformer
+    elif backbone_name == "EnformerFrozenBase":
+        return EnformerFrozenBase
+    elif backbone_name == "EnformerFullFrozenBase":
+        return EnformerFullFrozenBase
+    elif backbone_name == "EnformerRandomInit":
+        return EnformerRandomInit
+    elif backbone_name == "MPRAnn":
+        return MPRAnn
+    elif backbone_name == "LegNet":
+        return LegNet
+    elif backbone_name == "LegNetLarge":
+        return LegNetLarge
+    elif backbone_name == "Malinois":
+        return Malinois
+    else:
+        raise ValueError("Backbone name not recognized")
+    
+def get_all_backbone_names():
+    return ["MTLucifer", "MTLuciferWithResidualBlocks", 
+            "PureCNN", "PureCNNLarge", "ResNet", 
+            "MotifBasedFCN", "MotifBasedFCNLarge", 
+            "DNABERT", "DNABERTRandomInit",
+            "Enformer", "EnformerFrozenBase", "EnformerFullFrozenBase", "EnformerRandomInit", 
+            "MPRAnn", 
+            "LegNet", "LegNetLarge", 
+            "Malinois"]
+
+
+class CNNBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding="same", dilation=1, bias=True, gn_num_groups=None, gn_group_size=16):
         super().__init__()
         self.cnn = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, \
                              stride=stride, padding=padding, dilation=dilation, bias=bias)
-        # self.bn = nn.BatchNorm1d(out_channels)
+        if gn_num_groups is None:
+            gn_num_groups = out_channels // gn_group_size
         self.gn = nn.GroupNorm(gn_num_groups, out_channels)
         self.dropout = nn.Dropout(0.1)
         
     def forward(self, inputs):
         seq = inputs
-        # x = self.bn(F.relu(self.cnn(seq)))
         x = self.gn(F.gelu(self.cnn(seq)))
-        x = self.dropout(x)
-        
-        return x
-
-class CNNBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=1, dilation=1, bias=False):
-        super().__init__()
-        self.cnn = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, \
-                             stride=stride, padding=padding, dilation=dilation, bias=bias)
-        self.bn = nn.BatchNorm1d(out_channels)
-        self.dropout = nn.Dropout(0.1)
-        
-    def forward(self, inputs):
-        seq = inputs
-        x = self.bn(F.relu(self.cnn(seq)))        
         x = self.dropout(x)
         
         return x
     
 class ResidualBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3):
+    def __init__(self, in_channels, out_channels, kernel_size, gn_num_groups=None, gn_group_size=16):
         super().__init__()
 
         stride_for_conv1_and_shortcut = 1
@@ -62,14 +101,17 @@ class ResidualBlock(nn.Module):
 
         padding = kernel_size // 2
 
-        # modules for processing the input
-        self.bn1 = nn.BatchNorm1d(out_channels)
-        self.relu1 = nn.ReLU(inplace=True)
-        self.conv1 = nn.Conv1d(in_channels = in_channels, out_channels = out_channels, kernel_size = kernel_size, stride = stride_for_conv1_and_shortcut, padding = padding, bias=False)
+        if gn_num_groups is None:
+            gn_num_groups = out_channels // gn_group_size
 
-        self.bn2 = nn.BatchNorm1d(out_channels)
+        # modules for processing the input
+        self.conv1 = nn.Conv1d(in_channels = in_channels, out_channels = out_channels, kernel_size = kernel_size, stride = stride_for_conv1_and_shortcut, padding = padding, bias=False)
+        self.gn1 = nn.GroupNorm(gn_num_groups, out_channels)
+        self.relu1 = nn.ReLU(inplace=True)
+
+        self.conv2 = nn.Conv1d(in_channels = out_channels, out_channels = out_channels, kernel_size = kernel_size, stride = 1, padding = "same", bias=False)
+        self.gn2 = nn.GroupNorm(gn_num_groups, out_channels)
         self.relu2 = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv1d(in_channels = out_channels, out_channels = out_channels, kernel_size = kernel_size, stride = 1, padding = padding, bias=False)
 
         # short cut connections
         self.shortcut = nn.Identity()
@@ -77,37 +119,19 @@ class ResidualBlock(nn.Module):
             self.shortcut = nn.Conv1d(in_channels = in_channels, out_channels = out_channels, kernel_size = 1, stride = stride_for_conv1_and_shortcut, bias=False)
 
     def forward(self, xl):
-        input = xl
-        
-        if isinstance(self.shortcut, nn.Conv1d):
-            input = self.shortcut(xl)
-        else:
-            input = self.shortcut(input)
+        input = self.shortcut(xl)
 
-        xl = self.relu1(self.bn1(self.conv1(xl)))
+        xl = self.relu1(self.gn1(self.conv1(xl)))
         xl = self.conv2(xl)
 
         xlp1 = input + xl
 
-        xlp1 = self.relu2(self.bn2(xlp1))
+        xlp1 = self.relu2(self.gn2(xlp1))
 
         return xlp1
-
-# class TransformerBlock(nn.Module):
-#     def __init__(self, d_model=256, nhead=8, batch_first=True):
-#         super().__init__()
-#         self.transformer_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, batch_first=batch_first)
     
-#     def forward(self, inputs):
-#         seq = inputs
-#         seq = seq.permute(0, 2, 1)
-#         x = self.transformer_layer(seq)
-#         x = x.permute(0, 2, 1)
-        
-#         return x
-
 class TransformerBlock(nn.Module):
-    def __init__(self, d_model, nhead, mlp_dim=4096, dropout=0.1, use_position_embedding=True):
+    def __init__(self, d_model, nhead, mlp_dim, dropout=0.1, use_position_embedding=True):
         assert d_model % nhead == 0
         super().__init__()
         embedding_dim = d_model
@@ -172,124 +196,70 @@ class TransformerBlock(nn.Module):
         x = x + mlp_inputs
 
         return x
-
+    
 class MTLucifer(nn.Module):
-    def __init__(self, nucleotide_embed_dims=768, nheads=8):
+    def __init__(self, nucleotide_embed_dims=1024, nheads=8, mlp_dim_ratio=4):
         super().__init__()
         self.nheads = nheads
-        self.cls_token_embedding = nn.Parameter(torch.randn(nucleotide_embed_dims))
+        self.cls_token_embedding = nn.Parameter(torch.normal(mean=0.0, std=0.02, size=(1, 1, nucleotide_embed_dims)))
         self.embed_dims = nucleotide_embed_dims
+        self.nheads = nheads
+        self.mlp_dim = nucleotide_embed_dims * mlp_dim_ratio
         
         self.promoter_cnn = nn.Sequential(
-                                            CNNBlock(in_channels = 4, out_channels = 256, kernel_size = 5, stride = 1, padding = 1, bias=True),
-                                            CNNBlock(in_channels = 256, out_channels = 512, kernel_size = 5, stride = 1, padding = 1, bias=True),
-                                            CNNBlock(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5, stride = 1, padding = 1, bias=True)
+                                            CNNBlock(in_channels = 4, out_channels = 256, kernel_size = 5, stride = 1, bias=True),
+                                            CNNBlock(in_channels = 256, out_channels = 512, kernel_size = 5, stride = 1, bias=True),
+                                            CNNBlock(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5, stride = 1, bias=True)
                                          )
         self.promoter_transformer = nn.Sequential(
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, batch_first=True),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, batch_first=True),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, batch_first=True),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, batch_first=True),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, batch_first=True)
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim)
                                         )
         
     def forward(self, seq):
         seq = seq.permute(0, 2, 1)
         seq = self.promoter_cnn(seq)
         seq = seq.permute(0, 2, 1)
-        seq = torch.hstack([self.cls_token_embedding.unsqueeze(0).unsqueeze(0).expand(seq.shape[0], -1, -1), seq]).permute(0, 2, 1)
-        outs = self.promoter_transformer(seq)[:, :, 0]
-
-        return outs
-    
-class MTLuciferGN(nn.Module):
-    def __init__(self, nucleotide_embed_dims=768, nheads=8):
-        super().__init__()
-        self.nheads = nheads
-        self.cls_token_embedding = nn.Parameter(torch.randn(nucleotide_embed_dims))
-        self.embed_dims = nucleotide_embed_dims
-        
-        self.promoter_cnn = nn.Sequential(
-                                            CNNBlockGN(in_channels = 4, out_channels = 256, kernel_size = 5, stride = 1, padding = 1, bias=True),
-                                            CNNBlockGN(in_channels = 256, out_channels = 512, kernel_size = 5, stride = 1, padding = 1, bias=True),
-                                            CNNBlockGN(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5, stride = 1, padding = 1, bias=True)
-                                         )
-        self.promoter_transformer = nn.Sequential(
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, batch_first=True),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, batch_first=True),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, batch_first=True),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, batch_first=True),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, batch_first=True)
-                                        )
-        
-    def forward(self, seq):
-        seq = seq.permute(0, 2, 1)
-        seq = self.promoter_cnn(seq)
-        seq = seq.permute(0, 2, 1)
-        seq = torch.hstack([self.cls_token_embedding.unsqueeze(0).unsqueeze(0).expand(seq.shape[0], -1, -1), seq]).permute(0, 2, 1)
-        outs = self.promoter_transformer(seq)[:, :, 0]
-
-        return outs
-
-class MTLuciferEnhanced(nn.Module):
-    def __init__(self, nucleotide_embed_dims=1024, nheads=8):
-        super().__init__()
-        self.nheads = nheads
-        self.cls_token_embedding = nn.Parameter(torch.randn(nucleotide_embed_dims))
-        self.embed_dims = nucleotide_embed_dims
-        
-        self.promoter_cnn = nn.Sequential(
-                                            CNNBlockGN(in_channels = 4, out_channels = 256, kernel_size = 5, stride = 1, padding = 1, bias=True),
-                                            CNNBlockGN(in_channels = 256, out_channels = 512, kernel_size = 5, stride = 1, padding = 1, bias=True),
-                                            CNNBlockGN(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5, stride = 1, padding = 1, bias=True)
-                                         )
-        self.promoter_transformer = nn.Sequential(
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads)
-                                        )
-        
-    def forward(self, seq):
-        seq = seq.permute(0, 2, 1)
-        seq = self.promoter_cnn(seq)
-        seq = seq.permute(0, 2, 1)
-        seq = torch.hstack([self.cls_token_embedding.unsqueeze(0).unsqueeze(0).expand(seq.shape[0], -1, -1), seq])
+        seq = torch.hstack([self.cls_token_embedding.expand(seq.shape[0], -1, -1), seq])
         outs = self.promoter_transformer(seq)[:, 0]
 
         return outs
-    
-class MTLuciferGranular(nn.Module):
-    def __init__(self, nucleotide_embed_dims=768, nheads=8):
+
+class MTLuciferWithResidualBlocks(nn.Module):
+    def __init__(self, nucleotide_embed_dims=1024, nheads=8, mlp_dim_ratio=4):
         super().__init__()
         self.nheads = nheads
-        self.cls_token_embedding = nn.Parameter(torch.randn(nucleotide_embed_dims))
+        self.cls_token_embedding = nn.Parameter(torch.normal(mean=0.0, std=0.02, size=(1, 1, nucleotide_embed_dims)))
         self.embed_dims = nucleotide_embed_dims
+        self.nheads = nheads
+        self.mlp_dim = nucleotide_embed_dims * mlp_dim_ratio
         
         self.promoter_cnn = nn.Sequential(
-                                            CNNBlockGN(in_channels = 4, out_channels = 256, kernel_size = 5, stride = 1, padding = "same", bias=True),
-                                            CNNBlockGN(in_channels = 256, out_channels = 512, kernel_size = 5, stride = 1, padding = "same", bias=True),
-                                            nn.MaxPool1d(5),
-                                            CNNBlockGN(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5, stride = 1, padding = "same", bias=True)
+                                            CNNBlock(in_channels = 4, out_channels = 256, kernel_size = 20),
+                                            ResidualBlock(in_channels = 256, out_channels = 256, kernel_size = 5),
+                                            ResidualBlock(in_channels = 256, out_channels = 512, kernel_size = 5),
+                                            ResidualBlock(in_channels = 512, out_channels = nucleotide_embed_dims, kernel_size = 5)
                                          )
         self.promoter_transformer = nn.Sequential(
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads),
-                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads)
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim),
+                                            TransformerBlock(d_model=nucleotide_embed_dims, nhead=self.nheads, mlp_dim=self.mlp_dim)
                                         )
         
     def forward(self, seq):
         seq = seq.permute(0, 2, 1)
         seq = self.promoter_cnn(seq)
         seq = seq.permute(0, 2, 1)
-        seq = torch.hstack([self.cls_token_embedding.unsqueeze(0).unsqueeze(0).expand(seq.shape[0], -1, -1), seq])
+        seq = torch.hstack([self.cls_token_embedding.expand(seq.shape[0], -1, -1), seq])
         outs = self.promoter_transformer(seq)[:, 0]
 
         return outs
-    
+  
 class PureCNN(nn.Module):
     def __init__(self, embed_dims=1024):
         super().__init__()
@@ -344,7 +314,7 @@ class PureCNNLarge(nn.Module):
         seq2 = F.relu(seq1)
         outs = self.linear2(seq2)
         return outs
-
+    
 class ResNet(nn.Module):
     def __init__(self, embed_dims=1024):
         super().__init__()
@@ -435,6 +405,136 @@ class DNABERT(nn.Module):
     def forward(self, seq):
         outs = self.model(seq)
         return outs.pooler_output
+    
+class DNABERTRandomInit(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = AutoModel.from_pretrained("zhihan1996/DNA_bert_6")
+        # reset all weights
+        self.model.apply(self.model._init_weights)
+        self.embed_dims = self.model.config.hidden_size
+    
+    def forward(self, seq):
+        outs = self.model(seq)
+        return outs.pooler_output
+    
+class Enformer(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = BaseEnformer.from_pretrained('EleutherAI/enformer-official-rough', target_length=-1)
+        self.embed_dims = self.model.dim*2
+        self.attention_pool = nn.Linear(self.embed_dims, 1)
+
+    def forward(self, seq):
+        outs = self.model(seq, return_only_embeddings=True)
+        attn_weights = self.attention_pool(outs).squeeze(2)
+        attn_weights = F.softmax(attn_weights, dim=1)
+        outs = einsum('b n d, b n -> b d', outs, attn_weights)
+        return outs
+    
+class EnformerFrozenBase(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = BaseEnformer.from_pretrained('EleutherAI/enformer-official-rough', target_length=-1)
+        # freeze the model
+        for param in self.model.parameters():
+            param.requires_grad = False
+        self.embed_dims = self.model.dim*2
+        self.attention_pool = nn.Linear(self.embed_dims, 1)
+
+    def forward(self, seq):
+        outs = self.model(seq, return_only_embeddings=True)
+        attn_weights = self.attention_pool(outs).squeeze(2)
+        attn_weights = F.softmax(attn_weights, dim=1)
+        outs = einsum('b n d, b n -> b d', outs, attn_weights)
+        return outs
+    
+class EnformerFullFrozenBase(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = BaseEnformer.from_pretrained('EleutherAI/enformer-official-rough', target_length=-1)
+        # freeze the model
+        for param in self.model.parameters():
+            param.requires_grad = False
+        self.embed_dims = None
+
+    def forward(self, seq):
+        outs = self.model(seq)
+        human_outs = outs["human"]
+        mouse_outs = outs["mouse"]
+        outs = torch.cat([human_outs, mouse_outs], dim=2)
+        return outs
+    
+class EnformerRandomInit(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = BaseEnformer.from_hparams(
+                                                    dim = 1536,
+                                                    depth = 11,
+                                                    heads = 8,
+                                                    output_heads = dict(flu = 3),
+                                                    target_length = -1,
+                                              )
+        self.embed_dims = self.model.dim*2
+        self.attention_pool = nn.Linear(self.embed_dims, 1)
+
+    def forward(self, seq):
+        outs = self.model(seq, return_only_embeddings=True)
+        attn_weights = self.attention_pool(outs).squeeze(2)
+        attn_weights = F.softmax(attn_weights, dim=1)
+        outs = einsum('b n d, b n -> b d', outs, attn_weights)
+        return outs
+
+# architecture from Agarwal et al. (2023)
+# https://doi.org/10.1101%2F2023.03.05.531189
+# can only be used with a single task as the linear layers take flattened activations from the CNN that are length dependent
+class MPRAnn(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv1d(in_channels=4, out_channels=250, kernel_size=7, padding="valid")
+        self.bn1 = nn.BatchNorm1d(250)
+        self.conv2 = nn.Conv1d(in_channels=250, out_channels=250, kernel_size=8, padding="valid")
+        self.bn2 = nn.BatchNorm1d(250)
+        self.pool1 = nn.MaxPool1d(kernel_size=2, stride=2)
+        self.dropout1 = nn.Dropout(0.1)
+        self.conv3 = nn.Conv1d(in_channels=250, out_channels=250, kernel_size=3, padding="valid")
+        self.bn3 = nn.BatchNorm1d(250)
+        self.conv4 = nn.Conv1d(in_channels=250, out_channels=100, kernel_size=2, padding="valid")
+        self.bn4 = nn.BatchNorm1d(100)
+        self.pool2 = nn.MaxPool1d(kernel_size=1, stride=1) # does nothing, idk why they even have this layer, but keeping it for consistency
+        self.dropout2 = nn.Dropout(0.1)
+        self.fc1 = nn.LazyLinear(300)
+        self.dropout3 = nn.Dropout(0.3)
+        self.fc2 = nn.Linear(300, 200)
+
+        self.embed_dims = 200
+
+    def forward(self, seq):
+        seq = seq.permute(0, 2, 1)
+        seq = self.conv1(seq)
+        seq = F.relu(seq)
+        seq = self.bn1(seq)
+        seq = self.conv2(seq)
+        seq = F.softmax(seq, dim=1)
+        seq = self.bn2(seq)
+        seq = self.pool1(seq)
+        seq = self.dropout1(seq)
+        seq = self.conv3(seq)
+        seq = F.softmax(seq, dim=1)
+        seq = self.bn3(seq)
+        seq = self.conv4(seq)
+        seq = F.softmax(seq, dim=1)
+        seq = self.bn4(seq)
+        seq = self.pool2(seq)
+        seq = self.dropout2(seq)
+        seq = seq.reshape((seq.shape[0], -1))
+        seq = self.fc1(seq)
+        seq = F.sigmoid(seq)
+        seq = self.dropout3(seq)
+        seq = self.fc2(seq)
+        seq = F.sigmoid(seq)
+
+        return seq
 
 class Concater(nn.Module):
     """
@@ -983,3 +1083,35 @@ class LegNetLarge(nn.Module):
         # score = (x * self.bins).sum(dim=1)
         
         # return logprobs, score
+    
+class Malinois(nn.Module):
+    def __init__(self, n_outputs) -> None:
+        super().__init__()
+
+        self.model = boda.model.BassetBranched(
+            input_len=600,
+            n_outputs=n_outputs,
+            n_linear_layers=1,
+            linear_channels=1000,
+            linear_dropout_p = 0.11625456877954289,
+            n_branched_layers = 3,
+            branched_channels = 140,
+            branched_activation = "ReLU",
+            branched_dropout_p = 0.5757068086404574,
+            loss_criterion = "L1KLmixed",
+            loss_args={'beta': 5.0},
+        )
+    
+    def forward(self, x):
+        # x is of shape (batch_size, seqlen, 4). pad with zeros to (batch_size, 600, 4)
+        assert x.shape[1] <= 600, "sequence length must be less than or equal to 600 for Malinois"
+        pad_size = 600 - x.shape[1]
+        left_pad = pad_size // 2
+        right_pad = pad_size - left_pad
+        x = F.pad(x, (0, 0, left_pad, right_pad), mode='constant', value=0)
+
+        x = x.permute(0, 2, 1) # (batch_size, 4, 600)
+
+        encoded = self.model.encode(x)
+        decoded = self.model.decode(encoded)
+        return decoded

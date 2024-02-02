@@ -28,15 +28,31 @@ We also provide the best model checkpoints for the pretrained and jointly traine
 
 ## Commands to be run to reproduce results
 
-### Install the package:
+### Install the package and dependencies:
 
-Run the following commands to install the package:
+Run the following commands to create a mamba/conda environment and install PyTorch. Further dependencies will be installed automatically when the package is installed.
+```
+mamba create -n promoter_modelling pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+mamba activate promoter_modelling
+```
+
+Also run the following commands for reproducible results:
+```
+conda env config vars set CUBLAS_WORKSPACE_CONFIG=:4096:8
+mamba deactivate
+mamba activate promoter_modelling
+```
+
+To run the Malinois model, you will need to install the boda package before installing our package as follows:
+```
+git clone https://github.com/sjgosai/boda2.git
+cd boda2/
+pip install -e .
+``
+
+Run the following command to install our package:
 ```
 python -m pip install -e .
-```
-Also run the following command for reproducible results:
-```
-export CUBLAS_WORKSPACE_CONFIG=:4096:8
 ```
 
 ### Commands to reproduce architecture validation results:
@@ -58,11 +74,6 @@ python train_models_with_different_fluorescence_data_splits.py --model_name Pure
 To get results using a larger pure CNN model:
 ```
 python train_models_with_different_fluorescence_data_splits.py --model_name PureCNNLarge --modelling_strategy single_task --single_task FluorescenceData --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --num_random_seeds 5 --use_existing_models
-```
-
-To get results using a large ResNet model:
-```
-python train_models_with_different_fluorescence_data_splits.py --model_name ResNet --modelling_strategy single_task --single_task FluorescenceData --lr 5e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --num_random_seeds 5 --use_existing_models
 ```
 
 To get results by finetuning a pretrained DNABERT model:
@@ -99,35 +110,48 @@ python train_models.py --modelling_strategy pretrain+linear_probing --pretrain_t
 
 python train_models.py --modelling_strategy pretrain+linear_probing --pretrain_tasks Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 20 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models.py --modelling_strategy pretrain+linear_probing --pretrain_tasks SuRE_classification --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 12 --pretrain_max_epochs 10 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
+python train_models.py --modelling_strategy pretrain+linear_probing --pretrain_tasks SuRE_classification --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 10 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models.py --modelling_strategy pretrain+linear_probing --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 12 --pretrain_max_epochs 8 --pretrain_train_mode "max_size_cycle" --num_random_seeds 5 --use_existing_models
+python train_models.py --modelling_strategy pretrain+linear_probing --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 8 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 ```
 
 Pretaining on various tasks and then performing fine-tuning on the fluorescence data:
 ```
-python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks RNASeq --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "max_size_cycle" --num_random_seeds 5 --use_existing_models
+python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks RNASeq --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
 python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks ENCODETFChIPSeq --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 10 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 20 --pretrain_train_mode "max_size_cycle" --num_random_seeds 5 --use_existing_models
+python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 12 --pretrain_max_epochs 10 --pretrain_train_mode "max_size_cycle" --num_random_seeds 5 --use_existing_models
+python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 12 --pretrain_max_epochs 8 --pretrain_train_mode "max_size_cycle" --num_random_seeds 5 --use_existing_models
+python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 ```
 
 Joint training on various tasks along with the fluorescence data:
 ```
-python train_models.py --modelling_strategy joint --joint_tasks RNASeq,FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models
+python train_models.py --modelling_strategy joint --joint_tasks RNASeq,FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 32 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models
 
-python train_models.py --modelling_strategy joint --joint_tasks ENCODETFChIPSeq,FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models
+python train_models.py --modelling_strategy joint --joint_tasks ENCODETFChIPSeq,FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 32 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models
 
-python train_models.py --modelling_strategy joint --joint_tasks Sharpr_MPRA,FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models
+python train_models.py --modelling_strategy joint --joint_tasks Sharpr_MPRA,FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 64 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models
 
 python train_models.py --modelling_strategy joint --joint_tasks SuRE_classification,FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 12 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models
 
 python train_models.py --modelling_strategy joint --joint_tasks SuRE_classification,Sharpr_MPRA,FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 12 --train_mode "min_size" --max_epochs 50 --num_random_seeds 1 --use_existing_models
+```
+
+Joint training on various tasks along with the Malinois MPRA data:
+```
+python train_models.py --modelling_strategy joint --joint_tasks RNASeq,Malinois_MPRA --shrink_test_set --lr 1e-4 --weight_decay 1e-4 --batch_size 32 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR"
+
+python train_models.py --modelling_strategy joint --joint_tasks ENCODETFChIPSeq,Malinois_MPRA --shrink_test_set --lr 1e-4 --weight_decay 1e-4 --batch_size 32 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR"
+
+python train_models.py --modelling_strategy joint --joint_tasks Sharpr_MPRA,Malinois_MPRA --shrink_test_set --lr 1e-4 --weight_decay 1e-4 --batch_size 64 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR"
+
+python train_models.py --modelling_strategy joint --joint_tasks SuRE_classification,Malinois_MPRA --shrink_test_set --lr 1e-4 --weight_decay 1e-4 --batch_size 8 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR"
+
+python train_models.py --modelling_strategy joint --joint_tasks SuRE_classification,Sharpr_MPRA,Malinois_MPRA --shrink_test_set --lr 1e-4 --weight_decay 1e-4 --batch_size 8 --train_mode "min_size" --max_epochs 50 --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR"
 ```
 
 ### Training using multiple splits of the fluorescence dataset:
@@ -141,26 +165,26 @@ Pretaining on various tasks and then performing linear probing on the fluorescen
 ```
 python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+linear_probing --pretrain_tasks RNASeq --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+linear_probing --pretrain_tasks ENCODETFChIPSeq --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 10 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
+python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+linear_probing --pretrain_tasks ENCODETFChIPSeq --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 32 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+linear_probing --pretrain_tasks Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 20 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
+python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+linear_probing --pretrain_tasks Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+linear_probing --pretrain_tasks SuRE_classification --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 12 --pretrain_max_epochs 10 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
+python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+linear_probing --pretrain_tasks SuRE_classification --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+linear_probing --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 12 --pretrain_max_epochs 8 --pretrain_train_mode "max_size_cycle" --num_random_seeds 5 --use_existing_models
+python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+linear_probing --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 ```
 
 Pretaining on various tasks and then performing fine-tuning on the fluorescence data:
 ```
-python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks RNASeq --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "max_size_cycle" --num_random_seeds 5 --use_existing_models
+python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks RNASeq --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks ENCODETFChIPSeq --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 10 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
+python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks ENCODETFChIPSeq --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 32 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 20 --pretrain_train_mode "max_size_cycle" --num_random_seeds 5 --use_existing_models
+python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 12 --pretrain_max_epochs 10 --pretrain_train_mode "max_size_cycle" --num_random_seeds 5 --use_existing_models
+python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 
-python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 12 --pretrain_max_epochs 8 --pretrain_train_mode "max_size_cycle" --num_random_seeds 5 --use_existing_models
+python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks FluorescenceData --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models
 ```
 
 ### Running the motif insertion analysis using the best model:
@@ -203,5 +227,5 @@ python train_models_with_different_fluorescence_data_splits.py --modelling_strat
 
 Pretaining on various tasks and then performing fine-tuning on the fluorescence data:
 ```
-python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks FluorescenceData_classification --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 12 --pretrain_max_epochs 8 --pretrain_train_mode "max_size_cycle" --num_random_seeds 5 --use_existing_models --metric_to_monitor val_Fluorescence_classification_mean_Accuracy
+python train_models_with_different_fluorescence_data_splits.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks FluorescenceData_classification --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 8 --pretrain_train_mode "min_size" --num_random_seeds 5 --use_existing_models --metric_to_monitor val_Fluorescence_classification_mean_Accuracy
 ```

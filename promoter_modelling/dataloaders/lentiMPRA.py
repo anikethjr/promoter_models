@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
-import pytorch_lightning as pl
+import lightning as L
 
 import torchmetrics
 
@@ -27,7 +27,7 @@ torch.manual_seed(97)
 
 class lentiMPRADataset(Dataset):
     def __init__(self, df, split, num_cells, cell_names, \
-                 cache_dir, use_cache=True):
+                 cache_dir, use_cache=True, shrink_set=False):
         super().__init__()
 
         self.df = df
@@ -73,6 +73,12 @@ class lentiMPRADataset(Dataset):
             self.all_outputs[cell][np.isnan(self.all_outputs[cell])] = -100000
         self.all_outputs = np.stack([self.all_outputs[cell] for cell in self.cell_names], axis=1)
         print("All outputs shape = {}".format(self.all_outputs.shape))
+
+        if shrink_set:
+            self.df = self.df.iloc[:10]
+            self.all_seqs = self.all_seqs[:10]
+            self.all_outputs = self.all_outputs[:10]
+            self.valid_outputs_mask = self.valid_outputs_mask[:10]
     
     def __len__(self):
         return len(self.df)
@@ -81,7 +87,7 @@ class lentiMPRADataset(Dataset):
         return self.all_seqs[idx], self.all_outputs[idx], self.valid_outputs_mask[idx]
 
 
-class lentiMPRADataLoader(pl.LightningDataModule):
+class lentiMPRADataLoader(L.LightningDataModule):
     def download_data(self):
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)
@@ -147,11 +153,12 @@ class lentiMPRADataLoader(pl.LightningDataModule):
                  batch_size, \
                  cache_dir, \
                  common_cache_dir, \
-                 n_cpus = 8, \
+                 n_cpus = 0, \
                  train_chromosomes = ['1', '3', '5', '6', '7', '8', '11', '12', '14', '15', '16', '18', '19', '22', 'X', 'Y', 'specialchr'], \
                  test_chromosomes = ['2', '9', '10', '13', '20', '21'], \
                  val_chromosomes = ['4', '17'], \
-                 use_cache = True):
+                 use_cache = True, 
+                 shrink_test_set=False):
         super().__init__()
 
         np.random.seed(97)
@@ -317,17 +324,19 @@ class lentiMPRADataLoader(pl.LightningDataModule):
                                                cache_dir=self.cache_dir, use_cache=use_cache)
         print("Creating test dataset")
         self.test_dataset = lentiMPRADataset(self.test_set, "test", self.num_cells, self.cell_names, \
-                                                cache_dir=self.cache_dir, use_cache=use_cache)
+                                                cache_dir=self.cache_dir, use_cache=use_cache, shrink_set=shrink_test_set)
         print("Creating val dataset")
         self.val_dataset = lentiMPRADataset(self.val_set, "val", self.num_cells, self.cell_names, \
-                                               cache_dir=self.cache_dir, use_cache=use_cache)
+                                               cache_dir=self.cache_dir, use_cache=use_cache, shrink_set=shrink_test_set)
+        
+        num_all_pairs = len(self.train_dataset) + len(self.test_dataset) + len(self.val_dataset)
         
         print("Train set has {} promoter-expression pairs ({:.2f}% of dataset)".format(len(self.train_dataset), \
-                                                                                        100.0*self.train_set.shape[0]/self.final_dataset.shape[0]))
+                                                                                        100.0*self.train_set.shape[0]/num_all_pairs))
         print("Test set has {} promoter-expression pairs ({:.2f}% of dataset)".format(len(self.test_dataset), \
-                                                                                        100.0*self.test_set.shape[0]/self.final_dataset.shape[0]))
+                                                                                        100.0*len(self.test_dataset)/num_all_pairs))
         print("Val set has {} promoter-expression pairs ({:.2f}% of dataset)".format(len(self.val_dataset), \
-                                                                                        100.0*self.val_set.shape[0]/self.final_dataset.shape[0]))
+                                                                                        100.0*len(self.val_dataset)/num_all_pairs))
         print("Completed Instantiation of lentiMPRA DataLoader")
     
     def train_dataloader(self):

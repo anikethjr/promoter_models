@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-import pytorch_lightning as pl
+import lightning as L
 
 import torchmetrics
 
@@ -46,7 +46,7 @@ class SharprMPRADataset(Dataset):
         return self.X[idx], self.Y[idx]
 
 # class used to read, process and build train, val, test sets using the Sharpr MPRA dataset preprocessed by Movva et al. (2019)
-class SharprMPRADataLoader(pl.LightningDataModule):
+class SharprMPRADataLoader(L.LightningDataModule):
     def download_data(self):
         if not os.path.exists(self.data_dir):
             os.mkdir(self.data_dir)
@@ -92,7 +92,7 @@ class SharprMPRADataLoader(pl.LightningDataModule):
     def __init__(self, \
                  batch_size, \
                  data_dir, \
-                 n_cpus = 8):
+                 n_cpus = 0):
         super().__init__()
 
         np.random.seed(97)

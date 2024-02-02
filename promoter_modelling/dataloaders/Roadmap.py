@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-import pytorch_lightning as pl
+import lightning as L
 
 from promoter_modelling.utils import fasta_utils
 
@@ -130,7 +130,7 @@ class RoadmapPredictDataset(Dataset):
 
 
 # class used to read, process and build train, val, test sets using the Roadmap dataset
-class RoadmapDataLoader(pl.LightningDataModule):
+class RoadmapDataLoader(L.LightningDataModule):
     def download_data(self):
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)
@@ -198,7 +198,7 @@ class RoadmapDataLoader(pl.LightningDataModule):
                  batch_size, \
                  cache_dir, \
                  common_cache_dir, \
-                 n_cpus = 8, \
+                 n_cpus = 0, \
                  train_chromosomes = ['1', '3', '5', '6', '7', '8', '11', '12', '14', '15', '16', '18', '19', '22'], \
                  test_chromosomes = ['2', '9', '10', '13', '20', '21'], \
                  val_chromosomes = ['4', '17'], \

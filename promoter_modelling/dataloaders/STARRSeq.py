@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
-import pytorch_lightning as pl
+import lightning as L
 
 import torchmetrics
 
@@ -77,7 +77,7 @@ def pad_collate(batch):
     
     return seq, targets, mask
     
-class STARRSeqDataLoader(pl.LightningDataModule):
+class STARRSeqDataLoader(L.LightningDataModule):
     def download_data(self):
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)
@@ -141,7 +141,7 @@ class STARRSeqDataLoader(pl.LightningDataModule):
                  batch_size, \
                  cache_dir, \
                  common_cache_dir, \
-                 n_cpus = 8, \
+                 n_cpus = 0, \
                  train_chromosomes = ['1', '3', '5', '6', '7', '8', '11', '12', '14', '15', '16', '18', '19', '22', 'X', 'Y'], \
                  test_chromosomes = ['2', '9', '10', '13', '20', '21'], \
                  val_chromosomes = ['4', '17'], \

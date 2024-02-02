@@ -11,23 +11,23 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-import pytorch_lightning as pl
+import lightning as L
 
 import torchmetrics
 
-from promoter_modelling.utils import fasta_utils
+from promoter_modelling.utils import fasta_utils, motif_detection_utils
 
 np.random.seed(97)
 torch.manual_seed(97)
 
 def determine_cell_specific_class(row):
     if row["class"] == "ClassIII":
-        return "ClassIII_" + row["final_provenance_x"].split(" ~ ")[1][len("type="):]
+        return "ClassIII_" + row["final_provenance"].split(" ~ ")[1][len("type="):]
     elif row["class"] == "ClassII":
-        return "ClassII_" + row["final_provenance_x"].split(" ~ ")[0][len("cell="):] + "_" + row["final_provenance_x"].split(" ~ ")[1][len("type="):] + "_" + row["final_provenance_x"].split(" ~ ")[2][len("total_num_motifs="):]
+        return "ClassII_" + row["final_provenance"].split(" ~ ")[0][len("cell="):] + "_" + row["final_provenance"].split(" ~ ")[1][len("type="):] + "_" + row["final_provenance"].split(" ~ ")[2][len("total_num_motifs="):]
     else:
-        log2FoldChange = float(row["final_provenance_x"].split(" ~ ")[2][len("log2FoldChange="):])
-        first_description = row["final_provenance_x"].split(" ~ ")[4][len("description="):].split(";")[0]
+        log2FoldChange = float(row["final_provenance"].split(" ~ ")[2][len("log2FoldChange="):])
+        first_description = row["final_provenance"].split(" ~ ")[4][len("description="):].split(";")[0]
         all_cells = ["NK92", "THP1", "JURKAT"]
         out = "ClassI"
         for c in all_cells:
@@ -91,7 +91,7 @@ class FluorescenceDataset(Dataset):
                self.all_motif_occurs[idx], \
                self.y[idx]
 
-class FluorescenceDataLoader(pl.LightningDataModule):    
+class FluorescenceDataLoader(L.LightningDataModule):    
     def download_data(self):
         if not os.path.exists(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv")):
             os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=15p6GhDop5BsUPryZ6pfKgwJ2XEVHRAYq' -O {}".format(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv")))
@@ -99,12 +99,7 @@ class FluorescenceDataLoader(pl.LightningDataModule):
         if not os.path.exists(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv")):
             os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1kTfsZvsCz7EWUhl-UZgK0B31LtxJH4qG' -O {}".format(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv")))
             assert os.path.exists(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv"))
-        # download motif occurrences file if not already downloaded
-        path_to_motif_occurrences_file = os.path.join(self.cache_dir, "motif_occurrences.tsv")
-        if not os.path.exists(path_to_motif_occurrences_file):
-            os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1AL431APt7AYG0fpgZlLCF9neUW1OTUYr' -O {}".format(path_to_motif_occurrences_file))
-            assert os.path.exists(path_to_motif_occurrences_file), "Failed to download motif occurrences file"      
-    
+        
     def update_metrics(self, y_hat, y, loss, split):
         self.all_metrics[split]["{}_avg_epoch_loss".format(self.name)].update(loss)
         for i, output in enumerate(self.output_names):
@@ -137,7 +132,7 @@ class FluorescenceDataLoader(pl.LightningDataModule):
                  batch_size, \
                  cache_dir, \
                  seed = None, \
-                 n_cpus = 8, \
+                 n_cpus = 0, \
                  min_reads = 5, \
                  train_fraction = 0.7, \
                  val_fraction = 0.1, \
@@ -178,9 +173,6 @@ class FluorescenceDataLoader(pl.LightningDataModule):
         self.cell_names = np.array(["JURKAT", "K562", "THP1"])
         self.num_outputs = self.num_cells
         self.output_names = self.cell_names
-        
-        # number of motifs for which we have occurrence counts
-        self.num_motifs = 762
                 
         self.cache_dir = cache_dir
         if not os.path.exists(self.cache_dir):
@@ -209,6 +201,14 @@ class FluorescenceDataLoader(pl.LightningDataModule):
                 if col.endswith("_sum") and col != "cum_sum":
                     self.measurements["keep"] = self.measurements["keep"] & (self.measurements[col] >= min_reads)
             self.measurements = self.measurements[self.measurements["keep"]].drop("keep", axis=1).reset_index(drop=True)
+
+            # divide the read counts by the total number of reads across sequences
+            for col in self.measurements.columns:
+                if not (col.endswith("_sum") or col == "sequence"):
+                    print("Normalizing {}, sum before = {}".format(col, self.measurements[col].sum()))
+                    self.measurements[col] = self.measurements[col] + 1.0 # pseudocount
+                    self.measurements[col] = self.measurements[col] / self.measurements[col].sum() # normalize
+                    print("After normalizing {}, sum = {}".format(col, self.measurements[col].sum()))
             
             for cell in self.cell_names:
                 first_letter_of_cell_name = cell[:1]
@@ -219,22 +219,22 @@ class FluorescenceDataLoader(pl.LightningDataModule):
                         other_cells_first_letters = [c[:1] for c in other_cells]
                         avg_ratio = 0
                         for other_cell, other_cell_first_letter in zip(other_cells, other_cells_first_letters):
-                            avg_ratio += (self.measurements["{}{}_P4".format(other_cell_first_letter, rep+1)] + 1) / (self.measurements["{}{}_P7".format(other_cell_first_letter, rep+1)] + 1)
+                            avg_ratio += (self.measurements["{}{}_P4".format(other_cell_first_letter, rep+1)]) / (self.measurements["{}{}_P7".format(other_cell_first_letter, rep+1)])
                         avg_ratio /= len(other_cells)
 
-                        cur_ratio = (self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)] + 1) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)] + 1)
+                        cur_ratio = (self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)]) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)])
 
                         # DE = ratio of P4 to P7 in cell of interest / ratio of P4 to P7 in other cells
                         self.measurements[cell] += np.log2(cur_ratio / avg_ratio)
                     else:
-                        self.measurements[cell] += np.log2((self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)] + 1) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)] + 1))
+                        self.measurements[cell] += np.log2((self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)]) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)]))
                 self.measurements[cell] /= self.num_replicates
 
             if self.zscore:
                 for cell in self.cell_names:
                     self.measurements[cell] = stats.zscore(self.measurements[cell])
 
-            self.sequence_properties = pd.read_csv(os.path.join(self.cache_dir, "motif_occurrences.tsv"), sep="\t")
+            self.sequence_properties = pd.read_csv(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv"), sep="\t")
             self.sequence_properties["cell_specific_class"] = self.sequence_properties.apply(lambda x: determine_cell_specific_class(x), axis=1)
 
             self.merged = self.measurements.merge(self.sequence_properties, on="sequence", how="inner")
@@ -291,6 +291,26 @@ class FluorescenceDataLoader(pl.LightningDataModule):
         
         self.merged = pd.read_csv(self.merged_cache_path, sep="\t")
         self.all_classes = sorted(list(set(self.merged["cell_specific_class"])))
+
+        # create motif occurrences file
+        self.path_to_motif_occurrences_file = os.path.join(self.cache_dir, "motif_occurrences.tsv")
+        if not os.path.exists(self.path_to_motif_occurrences_file):
+            vierstra_motifs_occurrences = motif_detection_utils.detect_vierstra_motifs_in_sequences(self.merged["sequence"].values, 
+                                                                                                    "FluorescenceData_sequences", 
+                                                                                                    self.cache_dir, 
+                                                                                                    os.path.join(self.cache_dir, "vierstra_motifs"))
+            vierstra_motifs_occurrences.to_csv(self.path_to_motif_occurrences_file, sep="\t", index=False)
+        else:
+            print("Loading motif occurrences file from cache...")
+            vierstra_motifs_occurrences = pd.read_csv(self.path_to_motif_occurrences_file, sep="\t")
+
+        # add motif occurrences to final dataset
+        motif_cols = [i for i in vierstra_motifs_occurrences.columns if ":" in i]
+        # number of motifs for which we have occurrence counts
+        self.num_motifs = 693
+        assert len(motif_cols) == self.num_motifs
+        for col in motif_cols:
+            self.merged[col] = vierstra_motifs_occurrences[col].values
         
         self.train_set = self.merged[self.merged["is_train"]].reset_index(drop=True)
         self.test_set = self.merged[self.merged["is_test"]].reset_index(drop=True)

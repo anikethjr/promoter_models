@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils import data
 from torch.utils.data import Dataset, DataLoader
-import pytorch_lightning as pl
+import lightning as L
 
 import torchmetrics
 
@@ -147,13 +147,16 @@ def generate_negative_sequences_and_build_all_x(merged_peaks, cache_dir, fasta_s
 
 # class to create batches for ENCODE TF-ChIP-Seq data
 class ENCODETFChIPSeqDataset(Dataset):
-    def __init__(self, x, split_name, num_outputs, output_names):
+    def __init__(self, x, split_name, num_outputs, output_names, shrink_set=False):
         super().__init__()
 
         self.num_outputs = num_outputs
         self.output_names = output_names
         self.x = x        
         self.num_windows = 1
+
+        if shrink_set:
+            self.x = self.x.iloc[:10]
         
     def __len__(self):
         return self.x.shape[0]
@@ -175,7 +178,7 @@ class ENCODETFChIPSeqDataset(Dataset):
         return seq, targets, mask
     
 # class used to read, process and build train, val, test sets using the ENCODE TF-ChIP-Seq datasets
-class ENCODETFChIPSeqDataLoader(pl.LightningDataModule):
+class ENCODETFChIPSeqDataLoader(L.LightningDataModule):
     def update_metrics(self, y_hat, y, loss, split):
         self.all_metrics[split]["{}_avg_epoch_loss".format(self.name)].update(loss)
 
@@ -193,7 +196,7 @@ class ENCODETFChIPSeqDataLoader(pl.LightningDataModule):
                  common_cache_dir, \
                  datasets_save_dir, \
                  fasta_shuffle_letters_path = "fasta_shuffle_letters", \
-                 n_cpus=8, \
+                 n_cpus=0, \
                  train_chromosomes = ['1', '3', '5', '6', '7', '8', '11', '12', '14', '15', '16', '18', '19', '22'], \
                  test_chromosomes = ['2', '9', '10', '13', '20', '21'], \
                  val_chromosomes = ['4', '17'], \
@@ -201,7 +204,8 @@ class ENCODETFChIPSeqDataLoader(pl.LightningDataModule):
                  max_peak_offset_for_grouping = 100, \
                  qValueThreshold = 0.05, \
                  min_num_peaks = 1000, \
-                 use_cache = True):
+                 use_cache = True, \
+                 shrink_test_set = False):
         super().__init__()
         
         np.random.seed(97)
@@ -392,10 +396,10 @@ class ENCODETFChIPSeqDataLoader(pl.LightningDataModule):
         self.train_dataset = ENCODETFChIPSeqDataset(self.train_set, "train", self.num_outputs, self.output_names)
         
         print("Creating test dataset")
-        self.test_dataset = ENCODETFChIPSeqDataset(self.test_set, "test", self.num_outputs, self.output_names)
+        self.test_dataset = ENCODETFChIPSeqDataset(self.test_set, "test", self.num_outputs, self.output_names, shrink_set=shrink_test_set)
         
         print("Creating val dataset")
-        self.val_dataset = ENCODETFChIPSeqDataset(self.val_set, "val", self.num_outputs, self.output_names)
+        self.val_dataset = ENCODETFChIPSeqDataset(self.val_set, "val", self.num_outputs, self.output_names, shrink_set=shrink_test_set)
         
         total_num_examples = len(self.train_dataset) + len(self.test_dataset) + len(self.val_dataset)
         
