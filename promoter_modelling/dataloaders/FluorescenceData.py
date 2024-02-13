@@ -226,6 +226,7 @@ class FluorescenceDataLoader(L.LightningDataModule):
                         # DE = ratio of P4 to P7 in cell of interest / ratio of P4 to P7 in other cells
                         self.measurements[cell] += np.log2(cur_ratio / avg_ratio)
                     else:
+                        self.measurements[f"log2({cell}{rep+1}_R)"] = np.log2((self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)]) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)]))
                         self.measurements[cell] += np.log2((self.measurements["{}{}_P4".format(first_letter_of_cell_name, rep+1)]) / (self.measurements["{}{}_P7".format(first_letter_of_cell_name, rep+1)]))
                 self.measurements[cell] /= self.num_replicates
 
