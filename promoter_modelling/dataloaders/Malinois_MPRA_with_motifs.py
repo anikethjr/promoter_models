@@ -341,7 +341,7 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
             np.random.seed(97)
             torch.manual_seed(97)
             # first keep sequences with measurements for all cell types
-            self.final_dataset = pd.read_csv(os.path.join(self.cache_dir, "common_sequences_data.csv"), sep="\t")
+            self.final_dataset = pd.read_csv(os.path.join(self.cache_dir, "common_sequences_data.csv"))
             # apply other formatting steps
             self.final_dataset["chr"] = self.final_dataset.apply(lambda x: x["ID"].split(":")[0], axis=1)
             self.final_dataset["length"] = self.final_dataset.apply(lambda x: len(x["sequence"]), axis=1)
