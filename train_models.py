@@ -1011,6 +1011,9 @@ if args.subsample_train_set:
     if args.finetune_tasks is not None:
         assert "Malinois_MPRA" in args.finetune_tasks, "Subsampling only works with Malinois_MPRA"
         args.finetune_tasks = args.finetune_tasks.replace("Malinois_MPRA", f"Malinois_MPRA_subsampled_{args.n_train_subsample}")
+    if args.single_task is not None:
+        assert "Malinois_MPRA" in args.single_task, "Subsampling only works with Malinois_MPRA"
+        args.single_task = args.single_task.replace("Malinois_MPRA", f"Malinois_MPRA_subsampled_{args.n_train_subsample}")
 
 # setup wandb
 root_dir = config["root_dir"]
