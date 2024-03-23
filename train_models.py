@@ -70,7 +70,7 @@ def train_model(args, config, finetune=False):
     
     if args.model_name.startswith("MotifBased"):
         assert len(tasks) == 1, "Motif-based models can only be trained on a single task"
-        assert tasks[0] == "FluorescenceData" or tasks[0] == "FluorescenceData_DE" or tasks[0] == "Malinois_MPRA", "Motif-based models can only be trained on FluorescenceData, FluorescenceData_DE, or Malinois_MPRA"
+        assert tasks[0] == "FluorescenceData" or tasks[0] == "FluorescenceData_DE" or ("Malinois_MPRA" in tasks[0]), "Motif-based models can only be trained on FluorescenceData, FluorescenceData_DE, or Malinois_MPRA"
 
     # load pretrained model state dict if necessary
     if "pretrain" in args.modelling_strategy and finetune:
@@ -177,18 +177,14 @@ def train_model(args, config, finetune=False):
     dataloaders = {}
     print("Instantiating dataloaders...")
     for task in tasks:
-        if task == "all_tasks" or task == "RNASeq": # special task names
+        if task == "RNASeq": # special task names
             dataloaders[task] = []
             tasks_set = None
             if args.modelling_strategy.startswith("pretrain"):
-                if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq"]
-                elif task == "RNASeq":
+                if task == "RNASeq":
                     tasks_set = ["LL100", "CCLE", "Roadmap"]
             elif args.modelling_strategy == "joint":
-                if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq", "FluorescenceData"]
-                elif task == "RNASeq":
+                if task == "RNASeq":
                     tasks_set = ["LL100", "CCLE", "Roadmap"]
 
             for t in tasks_set:
@@ -276,19 +272,30 @@ def train_model(args, config, finetune=False):
                 elif t == "FluorescenceData_classification":
                     dataloaders[task].append(FluorescenceData_classification.FluorescenceDataLoader(batch_size=batch_size, \
                                                                                                     cache_dir=os.path.join(root_data_dir, "FluorescenceData_classification")))
-                elif t == "Malinois_MPRA":
+                elif "Malinois_MPRA" in t:
+                    subsample_train_set = False
+                    n_train_subsample = None
+                    if "subsampled" in t:
+                        subsample_train_set = True
+                        n_train_subsample = int(t.split("_")[-1])
                     if args.model_name.startswith("MotifBased"):
                         dataloaders[task].append(Malinois_MPRA_with_motifs.MalinoisMPRADataLoader(batch_size=batch_size, \
                                                                                             cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
-                                                                                            common_cache_dir=common_cache_dir))
+                                                                                            common_cache_dir=common_cache_dir, 
+                                                                                            subsample_train_set=subsample_train_set, 
+                                                                                            n_train_subsample=n_train_subsample))
                     elif "DNABERT" in args.model_name:
                         dataloaders[task].append(Malinois_MPRA_DNABERT.MalinoisMPRADataLoader(batch_size=batch_size, \
                                                                                             cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
-                                                                                            common_cache_dir=common_cache_dir))
+                                                                                            common_cache_dir=common_cache_dir, 
+                                                                                            subsample_train_set=subsample_train_set, 
+                                                                                            n_train_subsample=n_train_subsample))
                     else:
                         dataloaders[task].append(Malinois_MPRA.MalinoisMPRADataLoader(batch_size=batch_size, \
                                                                                         cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
-                                                                                        common_cache_dir=common_cache_dir))
+                                                                                        common_cache_dir=common_cache_dir, 
+                                                                                        subsample_train_set=subsample_train_set, 
+                                                                                        n_train_subsample=n_train_subsample))
         elif task == "LL100":
             dataloaders[task] = LL100.LL100DataLoader(batch_size=batch_size, \
                                                         cache_dir=os.path.join(root_data_dir, "LL-100"), \
@@ -387,19 +394,30 @@ def train_model(args, config, finetune=False):
             dataloaders[task] = FluorescenceData.FluorescenceDataLoader(batch_size=batch_size, \
                                                                         cache_dir=os.path.join(root_data_dir, "FluorescenceData"), \
                                                                         return_specified_cells=[2])
-        elif task == "Malinois_MPRA":
+        elif "Malinois_MPRA" in task:
+            subsample_train_set = False
+            n_train_subsample = None
+            if "subsampled" in task:
+                subsample_train_set = True
+                n_train_subsample = int(task.split("_")[-1])
             if args.model_name.startswith("MotifBased"):
                 dataloaders[task] = Malinois_MPRA_with_motifs.MalinoisMPRADataLoader(batch_size=batch_size, \
                                                                                     cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
-                                                                                    common_cache_dir=common_cache_dir)
+                                                                                    common_cache_dir=common_cache_dir, 
+                                                                                    subsample_train_set=subsample_train_set, 
+                                                                                    n_train_subsample=n_train_subsample)
             elif "DNABERT" in args.model_name:
                 dataloaders[task] = Malinois_MPRA_DNABERT.MalinoisMPRADataLoader(batch_size=batch_size, \
                                                                                     cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
-                                                                                    common_cache_dir=common_cache_dir)
+                                                                                    common_cache_dir=common_cache_dir, 
+                                                                                    subsample_train_set=subsample_train_set, 
+                                                                                    n_train_subsample=n_train_subsample)
             else:
                 dataloaders[task] = Malinois_MPRA.MalinoisMPRADataLoader(batch_size=batch_size, \
                                                                                 cache_dir=os.path.join(root_data_dir, "Malinois_MPRA"), \
-                                                                                common_cache_dir=common_cache_dir)
+                                                                                common_cache_dir=common_cache_dir, 
+                                                                                subsample_train_set=subsample_train_set, 
+                                                                                n_train_subsample=n_train_subsample)
     
     all_dataloaders = []
     for task in tasks:
@@ -946,6 +964,8 @@ args.add_argument("--finetune_tasks", type=str, default=None, help="Comma separa
 args.add_argument("--single_task", type=str, default=None, help="Task to train on")
 
 args.add_argument("--shrink_test_set", action="store_true", help="Shrink large test sets (SuRE and ENCODETFChIPSeq) to 10 examples to make evaluation faster")
+args.add_argument("--subsample_train_set", action="store_true", help="Subsample training set")
+args.add_argument("--n_train_subsample", type=int, default=15000, help="Number of samples to subsample for training set")
 
 args.add_argument("--lr", type=float, default=1e-5, help="Learning rate")
 args.add_argument("--weight_decay", type=float, default=1e-4, help="Weight decay")
@@ -982,6 +1002,15 @@ assert os.path.exists(args.config_path), "Config file does not exist"
 # Load config file
 with open(args.config_path, "r") as f:
     config = json.load(f)
+
+# subsampling only works with Malinois_MPRA when finetuning/linear probing/joint training/individual training/simple regression
+if args.subsample_train_set:
+    if args.joint_tasks is not None:
+        assert "Malinois_MPRA" in args.joint_tasks, "Subsampling only works with Malinois_MPRA"
+        args.joint_tasks = args.joint_tasks.replace("Malinois_MPRA", f"Malinois_MPRA_subsampled_{args.n_train_subsample}")
+    if args.finetune_tasks is not None:
+        assert "Malinois_MPRA" in args.finetune_tasks, "Subsampling only works with Malinois_MPRA"
+        args.finetune_tasks = args.finetune_tasks.replace("Malinois_MPRA", f"Malinois_MPRA_subsampled_{args.n_train_subsample}")
 
 # setup wandb
 root_dir = config["root_dir"]

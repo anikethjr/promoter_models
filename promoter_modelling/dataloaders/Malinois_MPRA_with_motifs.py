@@ -203,7 +203,9 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
                  test_chromosomes = ["7", "13"], \
                  val_chromosomes = ["19", "21", "X"], \
                  use_cache = True, 
-                 shrink_test_set=False):
+                 shrink_test_set=False, 
+                 subsample_train_set=False, 
+                 n_train_subsample=15000):
         super().__init__()
 
         np.random.seed(97)
@@ -222,6 +224,13 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
 
         self.test_chromosomes = test_chromosomes
         self.val_chromosomes = val_chromosomes
+
+        self.subsample_train_set = subsample_train_set
+        self.n_train_subsample = n_train_subsample
+
+        if self.subsample_train_set:
+            print(f"Subsampling training set to {self.n_train_subsample} examples")
+            self.name = f"{self.name}_subsampled_{self.n_train_subsample}"
 
         self.promoter_windows_relative_to_TSS = [] # dummy
 
@@ -328,7 +337,56 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
         else:
             print("Loading final dataset from cache...")
 
-        self.final_dataset = pd.read_csv(self.final_dataset_path, sep="\t")
+        if self.subsample_train_set:
+            np.random.seed(97)
+            torch.manual_seed(97)
+            # first keep sequences with measurements for all cell types
+            self.final_dataset = pd.read_csv(os.path.join(self.cache_dir, "common_sequences_data.csv"), sep="\t")
+            # apply other formatting steps
+            self.final_dataset["chr"] = self.final_dataset.apply(lambda x: x["ID"].split(":")[0], axis=1)
+            self.final_dataset["length"] = self.final_dataset.apply(lambda x: len(x["sequence"]), axis=1)
+            self.final_dataset = self.final_dataset[self.final_dataset["length"] == 200].reset_index(drop=True) # filter out sequences that are not 200 bp long
+            self.final_dataset["is_val"] = self.final_dataset.apply(lambda x: x["chr"] in self.val_chromosomes, axis=1)
+            self.final_dataset["is_test"] = self.final_dataset.apply(lambda x: x["chr"] in self.test_chromosomes, axis=1)
+            self.final_dataset["is_train"] = ~(self.final_dataset["is_val"] | self.final_dataset["is_test"])
+
+            self.train_set = self.final_dataset[self.final_dataset["is_train"]].reset_index(drop=True)
+            self.test_set = self.final_dataset[self.final_dataset["is_test"]].reset_index(drop=True)
+            self.val_set = self.final_dataset[self.final_dataset["is_val"]].reset_index(drop=True)
+
+            # count the number of sequences per chromosome
+            chrom_counts = self.train_set["chr"].value_counts()
+            # subsample from each chromosome proportionally to get n_train_subsample examples
+            counts_to_keep_per_chrom = {}
+            n_so_far = 0
+            for chrom in chrom_counts.index:
+                counts_to_keep_per_chrom[chrom] = int(np.round(self.n_train_subsample*chrom_counts[chrom]/self.train_set.shape[0]))
+                n_so_far += counts_to_keep_per_chrom[chrom]
+            # adjust counts to keep to get exactly n_train_subsample examples
+            while n_so_far < self.n_train_subsample:
+                chrom = np.random.choice(chrom_counts.index)
+                counts_to_keep_per_chrom[chrom] += 1
+                n_so_far += 1
+            assert n_so_far == self.n_train_subsample
+            # keep the examples
+            # shuffle the dataframe
+            self.train_set = self.train_set.sample(frac=1, replace=False).reset_index(drop=True)
+            new_train_set = pd.DataFrame()
+            for chrom in chrom_counts.index:
+                new_train_set = pd.concat([new_train_set, self.train_set[self.train_set["chr"] == chrom].iloc[:counts_to_keep_per_chrom[chrom]]])
+            self.train_set = new_train_set.reset_index(drop=True)
+            # print the counts
+            print("Counts per chromosome:")
+            for chrom in chrom_counts.index:
+                print(chrom, self.train_set[self.train_set["chr"] == chrom].shape[0])
+                assert self.train_set[self.train_set["chr"] == chrom].shape[0] == counts_to_keep_per_chrom[chrom]
+            assert self.train_set.shape[0] == self.n_train_subsample
+            self.final_dataset = pd.concat([self.train_set, self.test_set, self.val_set]).reset_index(drop=True)
+        else:
+            self.final_dataset = pd.read_csv(self.final_dataset_path, sep="\t")
+            self.train_set = self.final_dataset[self.final_dataset["is_train"]].reset_index(drop=True)
+            self.test_set = self.final_dataset[self.final_dataset["is_test"]].reset_index(drop=True)
+            self.val_set = self.final_dataset[self.final_dataset["is_val"]].reset_index(drop=True)
 
         # create motif occurrences file
         self.path_to_motif_occurrences_file = os.path.join(self.cache_dir, "motif_occurrences.tsv")
