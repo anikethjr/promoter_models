@@ -128,6 +128,34 @@ python train_models.py --model_name DNABERTRandomInit --modelling_strategy singl
 python train_models.py --model_name EnformerRandomInit --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-4 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode min_size --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models
 ```
 
+#### Using the subsampled Malinois MPRA:
+We subsample the train set to 15k sequences to roughly match the size of the Fluorescence data. To get results using the subsampled Malinois MPRA data, run the following commands:
+```
+python train_models.py --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode min_size --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name MotifBasedFCN --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name MotifBasedFCNLarge --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name PureCNN --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name PureCNNLarge --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name ResNet --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name LegNet --modelling_strategy single_task --single_task Malinois_MPRA --lr 0.005 --weight_decay 0.01 --batch_size 1024 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name LegNetLarge --modelling_strategy single_task --single_task Malinois_MPRA --lr 0.005 --weight_decay 0.01 --batch_size 192 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name MPRAnn --modelling_strategy single_task --single_task Malinois_MPRA --lr 0.001 --weight_decay 0.0 --batch_size 32 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name Malinois --modelling_strategy single_task --single_task Malinois_MPRA --lr 0.0032658700881052086 --weight_decay 0.0003438210249762151 --batch_size 1076 --max_epochs 200 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --patience 30 --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name DNABERTRandomInit --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-5 --weight_decay 1e-4 --batch_size 64 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name EnformerRandomInit --modelling_strategy single_task --single_task Malinois_MPRA --lr 5e-4 --weight_decay 5e-4 --batch_size 96 --max_epochs 50 --train_mode min_size --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+```
+
 ### Evaluating all training strategies:
 #### Using the fluorescence data:
 Pretaining on various tasks using MTLucifer and then performing linear probing on the fluorescence data:
@@ -228,4 +256,55 @@ python train_models.py --model_name DNABERT --modelling_strategy single_task --s
 python train_models.py --model_name Enformer --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-4 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode min_size --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models
 
 python train_models.py --model_name EnformerFullFrozenBase --modelling_strategy single_task_simple_regression --single_task Malinois_MPRA --use_existing_models --num_random_seeds 5
+```
+
+#### Using the subsampled Malinois MPRA:
+Pretaining on various tasks using MTLucifer and then performing linear probing on the subsampled Malinois MPRA data:
+```
+python train_models.py --modelling_strategy pretrain+linear_probing --pretrain_tasks RNASeq --finetune_tasks Malinois_MPRA --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy pretrain+linear_probing --pretrain_tasks ENCODETFChIPSeq --finetune_tasks Malinois_MPRA --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 64 --pretrain_max_epochs 10 --pretrain_train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy pretrain+linear_probing --pretrain_tasks Sharpr_MPRA --finetune_tasks Malinois_MPRA --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy pretrain+linear_probing --pretrain_tasks SuRE_classification --finetune_tasks Malinois_MPRA --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy pretrain+linear_probing --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks Malinois_MPRA --shrink_test_set --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+```
+
+Pretaining on various tasks using MTLucifer and then performing fine-tuning on the subsampled Malinois MPRA data:
+```
+python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks RNASeq --finetune_tasks Malinois_MPRA --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks ENCODETFChIPSeq --finetune_tasks Malinois_MPRA --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 64 --pretrain_max_epochs 10 --pretrain_train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks Sharpr_MPRA --finetune_tasks Malinois_MPRA --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 96 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification --finetune_tasks Malinois_MPRA --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification,Sharpr_MPRA --finetune_tasks Malinois_MPRA --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy pretrain+finetune --pretrain_tasks SuRE_classification,Sharpr_MPRA,lentiMPRA --finetune_tasks Malinois_MPRA --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode "min_size" --pretrain_lr 1e-5 --pretrain_weight_decay 1e-4 --pretrain_batch_size 24 --pretrain_max_epochs 50 --pretrain_train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+```
+
+Joint training on various tasks along with the subsampled Malinois MPRA data:
+```
+python train_models.py --modelling_strategy joint --joint_tasks RNASeq,Malinois_MPRA --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 32 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy joint --joint_tasks ENCODETFChIPSeq,Malinois_MPRA --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 32 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy joint --joint_tasks Sharpr_MPRA,Malinois_MPRA --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 64 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy joint --joint_tasks SuRE_classification,Malinois_MPRA --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 8 --max_epochs 50 --train_mode "min_size" --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --modelling_strategy joint --joint_tasks SuRE_classification,Sharpr_MPRA,Malinois_MPRA --shrink_test_set --lr 1e-5 --weight_decay 1e-4 --batch_size 8 --train_mode "min_size" --max_epochs 50 --num_random_seeds 1 --use_existing_models --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --subsample_train_set --n_train_subsample 15000
+```
+
+Fine-tuning DNABERT and Enformer models on the subsampled Malinois MPRA data (the last command does linear probing using Lasso on Enformer outputs):
+```
+python train_models.py --model_name DNABERT --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-5 --weight_decay 1e-4 --batch_size 64 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name Enformer --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-3 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --train_mode min_size --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+
+python train_models.py --model_name EnformerFullFrozenBase --modelling_strategy single_task_simple_regression --single_task Malinois_MPRA --use_existing_models --num_random_seeds 5 --subsample_train_set --n_train_subsample 15000
 ```

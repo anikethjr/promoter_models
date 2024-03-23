@@ -182,14 +182,10 @@ def train_model(args, config, finetune=False):
             dataloaders[task] = []
             tasks_set = None
             if args.modelling_strategy.startswith("pretrain"):
-                if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq"]
-                elif task == "RNASeq":
+                if task == "RNASeq":
                     tasks_set = ["LL100", "CCLE", "Roadmap"]
             elif args.modelling_strategy == "joint":
-                if task == "all_tasks":
-                    tasks_set = ["LL100", "CCLE", "Roadmap", "SuRE_classification", "Sharpr_MPRA", "ENCODETFChIPSeq", "FluorescenceData"]
-                elif task == "RNASeq":
+                if task == "RNASeq":
                     tasks_set = ["LL100", "CCLE", "Roadmap"]
 
             for t in tasks_set:
