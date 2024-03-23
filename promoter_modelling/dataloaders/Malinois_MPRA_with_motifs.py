@@ -360,7 +360,7 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
             counts_to_keep_per_chrom = {}
             n_so_far = 0
             for chrom in chrom_counts.index:
-                counts_to_keep_per_chrom[chrom] = int(np.round(self.n_train_subsample*chrom_counts[chrom]/self.train_set.shape[0]))
+                counts_to_keep_per_chrom[chrom] = int(np.floor(self.n_train_subsample*chrom_counts[chrom]/self.train_set.shape[0]))
                 n_so_far += counts_to_keep_per_chrom[chrom]
             # adjust counts to keep to get exactly n_train_subsample examples
             while n_so_far < self.n_train_subsample:
