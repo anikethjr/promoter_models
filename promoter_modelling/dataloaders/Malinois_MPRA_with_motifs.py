@@ -390,6 +390,8 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
 
         # create motif occurrences file
         self.path_to_motif_occurrences_file = os.path.join(self.cache_dir, "motif_occurrences.tsv")
+        if self.subsample_train_set:
+            self.path_to_motif_occurrences_file = os.path.join(self.cache_dir, "motif_occurrences_subsampled_{}.tsv".format(self.n_train_subsample))
         if not os.path.exists(self.path_to_motif_occurrences_file):
             vierstra_motifs_occurrences = motif_detection_utils.detect_vierstra_motifs_in_sequences(self.final_dataset["sequence"].values, 
                                                                                                     "Malinois_MPRA_sequences", 
