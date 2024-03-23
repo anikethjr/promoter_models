@@ -28,7 +28,7 @@ torch.manual_seed(97)
 
 class MalinoisMPRADataset(Dataset):
     def __init__(self, df, split, num_cells, cell_names, \
-                 cache_dir, use_cache=True, shrink_set=False):
+                 cache_dir, use_cache=True, shrink_set=False, subsample_train_set=False, n_train_subsample=None):
         super().__init__()
 
         self.df = df
@@ -37,10 +37,15 @@ class MalinoisMPRADataset(Dataset):
         self.cell_names = cell_names
         self.cache_dir = cache_dir
         self.use_cache = use_cache
+        self.subsample_train_set = subsample_train_set
+        self.n_train_subsample = n_train_subsample
+
+        if self.subsample_train_set:
+            self.split = f"{self.split}_subsampled_{self.n_train_subsample}"
 
         # create/load encoded input sequences
-        if self.use_cache and os.path.exists(os.path.join(self.cache_dir, f"{split}_DNABERT_seqs.npy")):
-            self.all_seqs = np.load(os.path.join(self.cache_dir, f"{split}_DNABERT_seqs.npy"))
+        if self.use_cache and os.path.exists(os.path.join(self.cache_dir, f"{self.split}_DNABERT_seqs.npy")):
+            self.all_seqs = np.load(os.path.join(self.cache_dir, f"{self.split}_DNABERT_seqs.npy"))
             print("Loaded cached encoded sequences, shape = {}".format(self.all_seqs.shape))
         else:
             print("Creating encoded sequences")

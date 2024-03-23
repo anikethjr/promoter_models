@@ -271,9 +271,9 @@ class MTLPredictor(L.LightningModule):
                         test_inds = self.all_dataloaders[i].final_dataset["is_test"]
                         val_inds = self.all_dataloaders[i].final_dataset["is_val"]
 
-                        y_mask_tain = self.y_mask[train_inds, j]
-                        X_train = self.backbone_outputs[train_inds][y_mask_tain]
-                        y_train = self.y[train_inds, j][y_mask_tain]
+                        y_mask_train = self.y_mask[train_inds, j]
+                        X_train = self.backbone_outputs[train_inds][y_mask_train]
+                        y_train = self.y[train_inds, j][y_mask_train]
 
                         y_mask_test = self.y_mask[test_inds, j]
                         X_test = self.backbone_outputs[test_inds][y_mask_test]
