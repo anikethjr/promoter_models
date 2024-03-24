@@ -436,13 +436,16 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
         
         print("Creating train dataset")
         self.train_dataset = MalinoisMPRADataset(self.train_set, "train", self.num_cells, self.cell_names, \
-                                                 cache_dir=self.cache_dir, use_cache=use_cache)
+                                                 cache_dir=self.cache_dir, use_cache=use_cache, 
+                                                 subsample_train_set=subsample_train_set, n_train_subsample=n_train_subsample)
         print("Creating test dataset")
         self.test_dataset = MalinoisMPRADataset(self.test_set, "test", self.num_cells, self.cell_names, \
-                                                cache_dir=self.cache_dir, use_cache=use_cache, shrink_set=shrink_test_set)
+                                                cache_dir=self.cache_dir, use_cache=use_cache, shrink_set=shrink_test_set, 
+                                                subsample_train_set=subsample_train_set, n_train_subsample=n_train_subsample)
         print("Creating val dataset")
         self.val_dataset = MalinoisMPRADataset(self.val_set, "val", self.num_cells, self.cell_names, \
-                                               cache_dir=self.cache_dir, use_cache=use_cache, shrink_set=shrink_test_set)
+                                               cache_dir=self.cache_dir, use_cache=use_cache, shrink_set=shrink_test_set, 
+                                               subsample_train_set=subsample_train_set, n_train_subsample=n_train_subsample)
         
         num_all_pairs = len(self.train_dataset) + len(self.test_dataset) + len(self.val_dataset)
         
