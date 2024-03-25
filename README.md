@@ -143,7 +143,7 @@ python train_models.py --model_name PureCNNLarge --modelling_strategy single_tas
 
 python train_models.py --model_name ResNet --modelling_strategy single_task --single_task Malinois_MPRA --lr 1e-5 --weight_decay 1e-4 --batch_size 96 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_subsampled_15000_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
 
-python train_models.py --model_name LegNet --modelling_strategy single_task --single_task Malinois_MPRA --lr 0.005 --weight_decay 0.01 --batch_size 1024 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_subsampled_15000_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
+python train_models.py --model_name LegNet --modelling_strategy single_task --single_task Malinois_MPRA --lr 0.05 --weight_decay 0.01 --batch_size 1024 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_subsampled_15000_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
 
 python train_models.py --model_name LegNetLarge --modelling_strategy single_task --single_task Malinois_MPRA --lr 0.005 --weight_decay 0.01 --batch_size 192 --max_epochs 50 --num_random_seeds 1 --metric_to_monitor "val_MalinoisMPRA_subsampled_15000_mean_SpearmanR" --use_existing_models --subsample_train_set --n_train_subsample 15000
 
