@@ -1,6 +1,20 @@
 # Strategies for effectively modelling promoter-driven gene expression using transfer learning
 
 The code base for our work on building accurate models of promoter-driven gene expression by leveraging existing genomic data.
+Please cite the following paper if you use our code or data:
+```bibtex
+@article{promoter_models_reddy_herschl_geng_2024,
+	author = {Reddy, Aniketh Janardhan and Herschl, Michael H and Geng, Xinyang and Kolli, Sathvik and Lu, Amy X and Kumar, Aviral and Hsu, Patrick D and Levine, Sergey and Ioannidis, Nilah M},
+	title = {Strategies for effectively modelling promoter-driven gene expression using transfer learning},
+	elocation-id = {2023.02.24.529941},
+	year = {2024},
+	doi = {10.1101/2023.02.24.529941},
+	publisher = {Cold Spring Harbor Laboratory},
+	URL = {https://www.biorxiv.org/content/early/2024/05/19/2023.02.24.529941},
+	eprint = {https://www.biorxiv.org/content/early/2024/05/19/2023.02.24.529941.full.pdf},
+	journal = {bioRxiv}
+}
+```
 
 We give the complete list of commands needed to reproduce our main modelling results using this code base. 
 
