@@ -400,7 +400,19 @@ def pad_collate(batch):
     seq = pad_sequence(seq, batch_first=True, padding_value=0)
 
     return seq, torch.vstack(targets)
-            
+
+def list_files(directory):
+    # List and sort all files in the directory
+    if os.path.exists(directory):
+        all_files = sorted(os.listdir(directory))
+        print(f"Files in {directory}:")
+        for file in all_files:
+            file_path = os.path.join(directory, file)
+            file_size = os.path.getsize(file_path)
+            print(f"Filename: {file}, Size: {file_size} bytes")
+    else:
+        print(f"Directory {directory} does not exist.")
+
 # class used to read, process and build train, val, test sets using the SuRE 2019 datasets
 # From GEO (https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE128325):
 # SuRE-seq assays with 8 libraries obtained from four heterozygous genomes from the 1000-genomes project, 
@@ -416,7 +428,7 @@ def pad_collate(batch):
 # and there are multiple data columns with read counts (depending on how many replicates were used) - 
 # SuRE*_*HEPG2* are for HepG2
 # other SuRE*_* columns are for K562
-class SuREDataLoader(L.LightningDataModule):
+class SuREDataLoader(L.LightningDataModule):        
     def download_data(self):
         download_path = None
         if self.genome_id == "SuRE42_HG02601":
@@ -430,14 +442,18 @@ class SuREDataLoader(L.LightningDataModule):
         else:
             raise Exception("ERROR: invalid genome specified. Must be one of SuRE42_HG02601, SuRE43_GM18983, SuRE44_HG01241 or SuRE45_HG03464")
 
+        # put the raw zipped data into the SuRE_data directory
         genome_zipped_file_path = os.path.join(self.datasets_save_dir, self.genome_id + ".zip")
         if not os.path.exists(genome_zipped_file_path):
             os.system("wget {} -O {}".format(download_path, genome_zipped_file_path))
             assert os.path.exists(genome_zipped_file_path)
+        list_files(self.datasets_save_dir)
 
+        # unzip the raw data and put it into the SuRE_data/genome_id directory
         if not os.path.exists(self.cur_datasets_save_dir):
             os.system("unzip {}".format(genome_zipped_file_path))
             assert os.path.exists(self.cur_datasets_save_dir)
+        list_files(self.cur_datasets_save_dir)
 
         self.fasta_file = os.path.join(self.common_cache_dir, "hg19.fa")
         if not os.path.exists(self.fasta_file):
@@ -573,8 +589,11 @@ class SuREDataLoader(L.LightningDataModule):
         self.datasets_save_dir = datasets_save_dir
         if not os.path.exists(self.datasets_save_dir):
             os.mkdir(self.datasets_save_dir)
-        self.cur_datasets_save_dir = os.path.join(datasets_save_dir, genome_id)
-        
+       
+        self.cur_datasets_save_dir = os.path.join(self.datasets_save_dir, genome_id)
+        if not os.path.exists(self.cur_datasets_save_dir):
+            os.mkdir(self.cur_datasets_save_dir)
+
         self.cur_stats_save_dir = os.path.join(self.cur_cache_dir, "stats")
         if not os.path.exists(self.cur_stats_save_dir):
             os.mkdir(self.cur_stats_save_dir)
@@ -592,6 +611,7 @@ class SuREDataLoader(L.LightningDataModule):
             self.fasta_extractor = fasta_utils.FastaStringExtractor(self.fasta_file)
 
             self.all_files = sorted(os.listdir(self.cur_datasets_save_dir))
+            print("Files in cur_datasets_save_dir are: {self.all_files}")
 
             # preprocess each file - uncomment following lines to run in parallel
     #         Parallel(n_jobs=-1)(delayed(preprocess_file)(file, \

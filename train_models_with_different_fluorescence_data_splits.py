@@ -28,10 +28,30 @@ np.random.seed(97)
 torch.manual_seed(97)
 torch.set_float32_matmul_precision('medium')
 
+def get_base_directory(default_dir):
+    try:
+        # Check if running in Google Colab
+        if 'google.colab' in str(get_ipython()):
+            print("Running in Google Colab")
+            # Check if Google Drive is mounted
+            if 'drive' in os.listdir('/content'):
+                print("Google Drive is mounted")
+                base_dir = f'/content/drive/My Drive/promoter_models/{default_dir}'
+            else:
+                print("Google Drive is not mounted")
+                base_dir = f'/content/promoter_models/{default_dir}'
+        else:
+            print("Running on local machine")
+            base_dir = default_dir
+    except NameError:
+        print("Running on local machine")
+        base_dir = default_dir
+    return base_dir
+
 def train_model(args, config, finetune=False):
     # create directories
     # for modelling
-    root_dir = config["root_dir"]
+    root_dir = get_base_directory(config["root_dir"])
     if not os.path.exists(root_dir):
         os.makedirs(root_dir, exist_ok=True)
     model_save_dir = os.path.join(root_dir, "saved_models")
@@ -42,7 +62,7 @@ def train_model(args, config, finetune=False):
         os.makedirs(summaries_save_dir, exist_ok=True)
 
     # for data
-    root_data_dir = config["root_data_dir"]
+    root_data_dir = get_base_directory(config["root_data_dir"])
     if not os.path.exists(root_data_dir):
         os.makedirs(root_data_dir, exist_ok=True)
     common_cache_dir = os.path.join(root_data_dir, "common")
