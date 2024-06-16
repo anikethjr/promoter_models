@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.stats as stats
 from tqdm import tqdm
+import shlex
 
 import torch
 import torch.nn as nn
@@ -93,6 +94,7 @@ class FluorescenceDataset(Dataset):
 
 class FluorescenceDataLoader(L.LightningDataModule):    
     def download_data(self):
+        self.cache_dir = shlex.quote(self.cache_dir)
         if not os.path.exists(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv")):
             os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=15p6GhDop5BsUPryZ6pfKgwJ2XEVHRAYq' -O {}".format(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv")))
             assert os.path.exists(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv"))

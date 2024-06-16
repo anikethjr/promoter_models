@@ -28,32 +28,50 @@ np.random.seed(97)
 torch.manual_seed(97)
 torch.set_float32_matmul_precision('medium')
 
+def is_colab():
+    try:
+        import google.colab
+        return True
+    except ImportError:
+        return False
+
+def is_drive_mounted():
+    return os.path.exists(os.path.join('/content/drive', 'My Drive'))
+
+def strip_dot_slash(filepath):
+    if filepath.startswith("./"):
+        return filepath[2:]
+    return filepath
+
 def get_base_directory(default_dir):
     try:
         # Check if running in Google Colab
-        if 'google.colab' in str(get_ipython()):
+        if is_colab():
             print("Running in Google Colab")
+            cleaned_default_dir = strip_dot_slash(default_dir)
             # Check if Google Drive is mounted
-            if 'drive' in os.listdir('/content'):
+            if is_drive_mounted():
                 print("Google Drive is mounted")
-                base_dir = f'/content/drive/My Drive/promoter_models/{default_dir}'
+                #base_dir = f'/content/drive/My Drive/promoter_models/{default_dir}'
+                base_dir = os.path.join('/content/drive', 'My Drive', 'promoter_models', cleaned_default_dir)
             else:
                 print("Google Drive is not mounted")
-                base_dir = f'/content/promoter_models/{default_dir}'
+                base_dir = f'/content/promoter_models/{cleaned_default_dir}'
         else:
             print("Running on local machine")
             base_dir = default_dir
     except NameError:
-        print("Running on local machine")
+        print("Running on local machine [Name Error]")
         base_dir = default_dir
     return base_dir
 
 def train_model(args, config, finetune=False):
     # create directories
     # for modelling
-    root_dir = get_base_directory(config["root_dir"])
+    root_dir = config["root_dir"]
     if not os.path.exists(root_dir):
         os.makedirs(root_dir, exist_ok=True)
+        #print(root_dir)
     model_save_dir = os.path.join(root_dir, "saved_models")
     if not os.path.exists(model_save_dir):
         os.makedirs(model_save_dir, exist_ok=True)
@@ -62,9 +80,10 @@ def train_model(args, config, finetune=False):
         os.makedirs(summaries_save_dir, exist_ok=True)
 
     # for data
-    root_data_dir = get_base_directory(config["root_data_dir"])
+    root_data_dir = config["root_data_dir"]
     if not os.path.exists(root_data_dir):
         os.makedirs(root_data_dir, exist_ok=True)
+        #print(root_data_dir)
     common_cache_dir = os.path.join(root_data_dir, "common")
     if not os.path.exists(common_cache_dir):
         os.makedirs(common_cache_dir, exist_ok=True)
@@ -1281,8 +1300,14 @@ args = args.parse_args()
 
 assert os.path.exists(args.config_path), "Config file does not exist"
 # Load config file
-with open(args.config_path, "r") as f:
-    config = json.load(f)
+with open(args.config_path, "r") as config_file:
+    config = json.load(config_file)
+
+# Get adjusted root directory and root data directory (based upon whether you are running in Colab or not)
+config['root_dir'] = get_base_directory(config['root_dir'])
+print(f"Root directory: {config['root_dir']}") # print directory to verify
+config['root_data_dir'] = get_base_directory(config['root_data_dir'])
+print(f"Root data directory: {config['root_data_dir']}") # print directory to verify
 
 # setup wandb
 root_dir = config["root_dir"]

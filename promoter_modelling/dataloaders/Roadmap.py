@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import scipy.stats as stats
 from tqdm import tqdm
+import shlex
 
 import torch
 import torch.nn as nn
@@ -137,9 +138,9 @@ class RoadmapDataLoader(L.LightningDataModule):
         if not os.path.exists(self.common_cache_dir):
             os.mkdir(self.common_cache_dir)
 
-        self.rnaseq_RPKM_path = os.path.join(self.cache_dir, "57epigenomes.RPKM.pc")
-        self.ensembl_gene_info_path = os.path.join(self.common_cache_dir, "ensembl_data.txt")
-        self.fasta_file = os.path.join(self.common_cache_dir, "hg38.fa")
+        self.rnaseq_RPKM_path = shlex.quote(os.path.join(self.cache_dir, "57epigenomes.RPKM.pc"))
+        self.ensembl_gene_info_path = shlex.quote(os.path.join(self.common_cache_dir, "ensembl_data.txt"))
+        self.fasta_file = shlex.quote(os.path.join(self.common_cache_dir, "hg38.fa"))
 
         if not os.path.exists(self.rnaseq_RPKM_path):
             os.system("wget https://egg2.wustl.edu/roadmap/data/byDataType/rna/expression/57epigenomes.RPKM.pc.gz -O {}".format(self.rnaseq_RPKM_path + ".gz"))

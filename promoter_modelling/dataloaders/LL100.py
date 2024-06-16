@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import scipy.stats as stats
 from tqdm import tqdm
+import shlex
 
 import torch
 import torch.nn as nn
@@ -137,9 +138,9 @@ class LL100DataLoader(L.LightningDataModule):
         if not os.path.exists(self.common_cache_dir):
             os.mkdir(self.common_cache_dir)
 
-        self.rnaseq_TPM_path = os.path.join(self.cache_dir, "rsem.merged.gene_tpm.tsv")
-        self.ensembl_gene_info_path = os.path.join(self.common_cache_dir, "ensembl_data.txt")
-        self.fasta_file = os.path.join(self.common_cache_dir, "hg38.fa")
+        self.rnaseq_TPM_path = shlex.quote(os.path.join(self.cache_dir, "rsem.merged.gene_tpm.tsv"))
+        self.ensembl_gene_info_path = shlex.quote(os.path.join(self.common_cache_dir, "ensembl_data.txt"))
+        self.fasta_file = shlex.quote(os.path.join(self.common_cache_dir, "hg38.fa"))
 
         if not os.path.exists(self.rnaseq_TPM_path):
             os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=12_WFTVbkm4gLp-qE1nPK-Jb8tSKX4giD' -O {}".format(self.rnaseq_TPM_path))

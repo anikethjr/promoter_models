@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import scipy.stats as stats
 from tqdm import tqdm
+import shlex
 
 import torch
 import torch.nn as nn
@@ -137,10 +138,10 @@ class CCLEDataLoader(L.LightningDataModule):
         if not os.path.exists(self.common_cache_dir):
             os.mkdir(self.common_cache_dir)
 
-        self.rnaseq_TPM_path = os.path.join(self.cache_dir, "OmicsExpressionProteinCodingGenesTPMLogp1.csv")
-        self.sample_info_path = os.path.join(self.cache_dir, "Model.csv")
-        self.ensembl_gene_info_path = os.path.join(self.common_cache_dir, "ensembl_data.txt")
-        self.fasta_file = os.path.join(self.common_cache_dir, "hg38.fa")
+        self.rnaseq_TPM_path = shlex.quote(os.path.join(self.cache_dir, "OmicsExpressionProteinCodingGenesTPMLogp1.csv"))
+        self.sample_info_path = shlex.quote(os.path.join(self.cache_dir, "Model.csv"))
+        self.ensembl_gene_info_path = shlex.quote(os.path.join(self.common_cache_dir, "ensembl_data.txt"))
+        self.fasta_file = shlex.quote(os.path.join(self.common_cache_dir, "hg38.fa"))
 
         if not os.path.exists(self.rnaseq_TPM_path):
             os.system("wget --save-cookies cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id={}' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\\1/p' > confirm && wget --load-cookies cookies.txt --no-check-certificate 'https://docs.google.com/uc?export=download&confirm='$(cat confirm)'&id={}' -O {} && rm cookies.txt confirm".format("1pfmnO9dhrBC_vtxNE3SjbJxanyMbNUgc", "1pfmnO9dhrBC_vtxNE3SjbJxanyMbNUgc", self.rnaseq_TPM_path))

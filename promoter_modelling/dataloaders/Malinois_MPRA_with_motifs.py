@@ -9,6 +9,7 @@ import scipy.stats as stats
 from tqdm import tqdm
 import gc
 from Bio.Seq import Seq
+import shlex
 
 import torch
 import torch.nn as nn
@@ -149,13 +150,13 @@ class MalinoisMPRADataLoader(L.LightningDataModule):
 
                 # download references and quantifications
                 element_references_download_url = f"https://www.encodeproject.org/files/{element_references_id}/@@download/{element_references_id}.fasta.gz"
-                element_references_download_path = os.path.join(self.cache_dir, f"{element_references_id}.fasta.gz")
+                element_references_download_path = shlex.quote(os.path.join(self.cache_dir, f"{element_references_id}.fasta.gz"))
                 os.system(f"wget -O {element_references_download_path} {element_references_download_url}")
                 os.system(f"gzip -d {element_references_download_path}")
                 assert os.path.exists(os.path.join(self.cache_dir, f"{element_references_id}.fasta"))
 
                 element_quantifications_url = f"https://www.encodeproject.org/files/{element_quantifications_id}/@@download/{element_quantifications_id}.tsv"
-                element_quantifications_download_path = os.path.join(self.cache_dir, f"{element_quantifications_id}.tsv")
+                element_quantifications_download_path = shlex.quote(os.path.join(self.cache_dir, f"{element_quantifications_id}.tsv"))
                 os.system(f"wget -O {element_quantifications_download_path} {element_quantifications_url}")
                 assert os.path.exists(os.path.join(self.cache_dir, f"{element_quantifications_id}.tsv"))
 
