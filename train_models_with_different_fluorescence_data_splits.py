@@ -36,7 +36,7 @@ def is_colab():
         return False
 
 def is_drive_mounted():
-    return os.path.exists(os.path.join('/content/drive', 'My Drive'))
+    return os.path.exists(os.path.join('/content/drive', 'MyDrive'))
 
 def strip_dot_slash(filepath):
     if filepath.startswith("./"):
@@ -52,8 +52,8 @@ def get_base_directory(default_dir):
             # Check if Google Drive is mounted
             if is_drive_mounted():
                 print("Google Drive is mounted")
-                #base_dir = f'/content/drive/My Drive/promoter_models/{default_dir}'
-                base_dir = os.path.join('/content/drive', 'My Drive', 'promoter_models', cleaned_default_dir)
+                #base_dir = f'/content/drive/MyDrive/promoter_models/{default_dir}'
+                base_dir = os.path.join('/content/drive', 'MyDrive', 'promoter_models', cleaned_default_dir)
             else:
                 print("Google Drive is not mounted")
                 base_dir = f'/content/promoter_models/{cleaned_default_dir}'
@@ -199,7 +199,7 @@ def train_model(args, config, finetune=False):
             name_format = "simple_regression_on_{}".format("+".join(tasks))
         else:
             name_format = "individual_training_on_{}".format("+".join(tasks))
-    
+
     # map to model classes
     model_class = backbone_modules.get_backbone_class(args.model_name)
     if args.model_name != "MTLucifer":
@@ -212,7 +212,7 @@ def train_model(args, config, finetune=False):
                 name_format += "_" + args.optional_name_suffix
         else:
             name_format += "_" + args.optional_name_suffix
-    
+
     # instantiate dataloaders
     dataloaders = {}
     print("Instantiating dataloaders...")
@@ -490,6 +490,7 @@ def train_model(args, config, finetune=False):
             np.random.seed(seed)
             torch.manual_seed(seed)
 
+
             for i in range(len(all_dataloaders)):
                 if all_dataloaders[i].name.startswith("Fluorescence"):
                     if args.model_name.startswith("MotifBased"):
@@ -600,7 +601,7 @@ def train_model(args, config, finetune=False):
                     check = True
         if check: # found existing model and using it
             print("Using existing models and evaluating them")
-            
+
             if (args.modelling_strategy == "pretrain+simple_regression" and finetune) or (args.modelling_strategy == "single_task_simple_regression"):
                 # load model, done automatically by fit_simple_regression
                 mtlpredictor.fit_simple_regression(unified_cache_dir=os.path.join(model_save_dir, name.split("_seed")[0] + "_unified_cache"), 
@@ -708,7 +709,8 @@ def train_model(args, config, finetune=False):
 
                 trainer = L.Trainer(logger=wandb_logger, \
                                     callbacks=[early_stop_callback, checkpoint_callback], \
-                                    deterministic=True, accelerator="gpu", devices=1, \
+                                    deterministic=True, \
+                                    accelerator="gpu", devices=1, \
                                     log_every_n_steps=10, default_root_dir=model_save_dir, \
                                     max_epochs=max_epochs, \
                                     limit_test_batches=0, reload_dataloaders_every_n_epochs=2, enable_progress_bar = True, \
@@ -840,6 +842,7 @@ def train_model(args, config, finetune=False):
                         cur_pred = cur_pred[mask]
                         print(f"Cell {output} has {len(cur_y)} valid values")
 
+                    # get overall metrics
                     r2 = r2_score(cur_y, cur_pred)
                     pearsonr = stats.pearsonr(cur_y, cur_pred)[0]
                     srho = stats.spearmanr(cur_y, cur_pred).correlation
@@ -848,7 +851,8 @@ def train_model(args, config, finetune=False):
                     print("{} PearsonR = {} ≈ {}".format(output, pearsonr, np.around(pearsonr, 4)))
                     print("{} Spearman rho = {} ≈ {}".format(output, srho, np.around(srho, 4)))
                     print()
-                    
+
+
                     # get highly expressed promoter metrics
                     highly_expressed_promoters = cur_y > np.percentile(cur_y, percentile_threshold_for_highly_expressed_promoters)
                     cur_y_highly_expressed_promoters = cur_y[highly_expressed_promoters]
@@ -1311,6 +1315,8 @@ print(f"Root data directory: {config['root_data_dir']}") # print directory to ve
 
 # setup wandb
 root_dir = config["root_dir"]
+if not os.path.exists(root_dir):
+    os.makedirs(root_dir, exist_ok=True)
 wandb_logs_save_dir = os.path.join(root_dir, "wandb_logs")
 if not os.path.exists(wandb_logs_save_dir):
     os.makedirs(wandb_logs_save_dir, exist_ok=True)

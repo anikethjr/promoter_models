@@ -91,13 +91,15 @@ class FluorescenceDataset(Dataset):
 
 class FluorescenceDataLoader(L.LightningDataModule):    
     def download_data(self):
-        self.cache_dir = shlex.quote(self.cache_dir)
-        if not os.path.exists(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv")):
-            os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=15p6GhDop5BsUPryZ6pfKgwJ2XEVHRAYq' -O {}".format(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv")))
-            assert os.path.exists(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv"))
-        if not os.path.exists(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv")):
-            os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1kTfsZvsCz7EWUhl-UZgK0B31LtxJH4qG' -O {}".format(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv")))
-            assert os.path.exists(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv"))
+        self.cache_dir_counts = shlex.quote(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv"))
+        if not os.path.exists(self.cache_dir_counts):
+            os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=15p6GhDop5BsUPryZ6pfKgwJ2XEVHRAYq' -O {}".format(self.cache_dir_counts))
+            assert os.path.exists(self.cache_dir_counts)
+
+        self.cache_dir_seq_list = shlex.quote(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv"))
+        if not os.path.exists(self.cache_dir_seq_list):
+            os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1kTfsZvsCz7EWUhl-UZgK0B31LtxJH4qG' -O {}".format(self.cache_dir_seq_list))
+            assert os.path.exists(self.cache_dir_seq_list)
     
     def update_metrics(self, y_hat, y, loss, split):
         self.all_metrics[split]["{}_avg_epoch_loss".format(self.name)].update(loss)

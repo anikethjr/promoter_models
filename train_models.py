@@ -27,12 +27,50 @@ np.random.seed(97)
 torch.manual_seed(97)
 torch.set_float32_matmul_precision('medium')
 
+def is_colab():
+    try:
+        import google.colab
+        return True
+    except ImportError:
+        return False
+
+def is_drive_mounted():
+    return os.path.exists(os.path.join('/content/drive', 'MyDrive'))
+
+def strip_dot_slash(filepath):
+    if filepath.startswith("./"):
+        return filepath[2:]
+    return filepath
+
+def get_base_directory(default_dir):
+    try:
+        # Check if running in Google Colab
+        if is_colab():
+            print("Running in Google Colab")
+            cleaned_default_dir = strip_dot_slash(default_dir)
+            # Check if Google Drive is mounted
+            if is_drive_mounted():
+                print("Google Drive is mounted")
+                #base_dir = f'/content/drive/MyDrive/promoter_models/{default_dir}'
+                base_dir = os.path.join('/content/drive', 'MyDrive', 'promoter_models', cleaned_default_dir)
+            else:
+                print("Google Drive is not mounted")
+                base_dir = f'/content/promoter_models/{cleaned_default_dir}'
+        else:
+            print("Running on local machine")
+            base_dir = default_dir
+    except NameError:
+        print("Running on local machine [Name Error]")
+        base_dir = default_dir
+    return base_dir
+
 def train_model(args, config, finetune=False):
     # create directories
     # for modelling
     root_dir = config["root_dir"]
     if not os.path.exists(root_dir):
         os.makedirs(root_dir, exist_ok=True)
+        #print(root_dir)
     model_save_dir = os.path.join(root_dir, "saved_models")
     if not os.path.exists(model_save_dir):
         os.makedirs(model_save_dir, exist_ok=True)
@@ -44,6 +82,7 @@ def train_model(args, config, finetune=False):
     root_data_dir = config["root_data_dir"]
     if not os.path.exists(root_data_dir):
         os.makedirs(root_data_dir, exist_ok=True)
+        #print(root_data_dir)
     common_cache_dir = os.path.join(root_data_dir, "common")
     if not os.path.exists(common_cache_dir):
         os.makedirs(common_cache_dir, exist_ok=True)
@@ -67,7 +106,7 @@ def train_model(args, config, finetune=False):
         tasks = [args.single_task]
     else:
         raise ValueError("Invalid modelling strategy")
-    
+
     if args.model_name.startswith("MotifBased"):
         assert len(tasks) == 1, "Motif-based models can only be trained on a single task"
         assert tasks[0] == "FluorescenceData" or tasks[0] == "FluorescenceData_DE" or ("Malinois_MPRA" in tasks[0]), "Motif-based models can only be trained on FluorescenceData, FluorescenceData_DE, or Malinois_MPRA"
@@ -430,7 +469,7 @@ def train_model(args, config, finetune=False):
     # train models
     all_seeds_r2 = {}
     all_seeds_pearsonr = {}
-    all_seeds_srho = {}    
+    all_seeds_srho = {}
 
     percentile_threshold_for_highly_expressed_promoters = 90
     percentile_threshold_for_lowly_expressed_promoters = 100 - percentile_threshold_for_highly_expressed_promoters
@@ -459,7 +498,6 @@ def train_model(args, config, finetune=False):
             # set random seed
             np.random.seed(seed)
             torch.manual_seed(seed)
-            
             name = name_format + "_seed_{}".format(seed)
         else:
             name = name_format
@@ -557,6 +595,7 @@ def train_model(args, config, finetune=False):
                 # get test set predictions
                 trainer = L.Trainer(accelerator="gpu", devices=1)
                 best_model_test_outputs = trainer.predict(mtlpredictor, mtlpredictor.get_mtldataloader().test_dataloader())
+
         else:
             print("Training model")
 
@@ -672,6 +711,7 @@ def train_model(args, config, finetune=False):
                     print("{} Precision = {} ≈ {}".format(output, precision, np.around(precision, 4)))
                     print("{} Recall = {} ≈ {}".format(output, recall, np.around(recall, 4)))
                     print()
+
             elif (("Fluorescence" in dl) or ("MalinoisMPRA" in dl)) and (("joint_" in name_format) or ("finetune_" in name_format) or ("linear_probing_" in name_format) or ("individual_" in name_format) or ("simple_regression" in name_format)):
                 print()
                 for j, output in enumerate(all_dataloaders[i].output_names):
@@ -694,6 +734,7 @@ def train_model(args, config, finetune=False):
                     print("{} PearsonR = {} ≈ {}".format(output, pearsonr, np.around(pearsonr, 4)))
                     print("{} Spearman rho = {} ≈ {}".format(output, srho, np.around(srho, 4)))
                     print()
+
 
                     # get highly expressed promoter metrics
                     highly_expressed_promoters = cur_y > np.percentile(cur_y, percentile_threshold_for_highly_expressed_promoters)
@@ -1000,8 +1041,14 @@ args = args.parse_args()
 
 assert os.path.exists(args.config_path), "Config file does not exist"
 # Load config file
-with open(args.config_path, "r") as f:
-    config = json.load(f)
+with open(args.config_path, "r") as config_file:
+    config = json.load(config_file)
+
+# Get adjusted root directory and root data directory (based upon whether you are running in Colab or not)
+config['root_dir'] = get_base_directory(config['root_dir'])
+print(f"Root directory: {config['root_dir']}") # print directory to verify
+config['root_data_dir'] = get_base_directory(config['root_data_dir'])
+print(f"Root data directory: {config['root_data_dir']}") # print directory to verify
 
 # subsampling only works with Malinois_MPRA when finetuning/linear probing/joint training/individual training/simple regression
 if args.subsample_train_set:

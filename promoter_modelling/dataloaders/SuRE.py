@@ -107,17 +107,21 @@ def preprocess_file(file, fasta_file, cur_cache_dir, cur_datasets_save_dir, cur_
         # ...
         # 91-100
         # > 100        
-        print("Binning expression values")
+        #print("Binning expression values")
         for cell in ["K562", "HepG2"]:
-            print(cell)
-            df["{}_bin".format(cell)] = np.ceil(df["avg_{}_exp".format(cell)] / 10).astype(int)
-            df["{}_bin".format(cell)][df["{}_bin".format(cell)] > 10] = 11
+            print(f"Binning expression values for {cell}")
+            column_name = "{}_bin".format(cell)
+            df[column_name] = np.ceil(df["avg_{}_exp".format(cell)] / 10).astype(int)
+            df.loc[df[column_name] > 10, column_name] = 11
             
+            print("file, cell, bin_number, number_of_samples")
             for bin_num in range(0, 12):                
-                subset = df[df["{}_bin".format(cell)] == bin_num].reset_index(drop=True)
-                print("{} {} bin {} samples = {}".format(file, cell, bin_num, subset.shape[0]))
-                
-        df.to_csv(os.path.join(cur_cache_dir, file), sep="\t", index=False)        
+                subset = df[df[column_name] == bin_num].reset_index(drop=True)
+                print("{}, {}, bin {}, samples = {}".format(file, cell, bin_num, subset.shape[0]))
+
+        print("Saving dataframe to csv...")        
+        df.to_csv(os.path.join(cur_cache_dir, file), sep="\t", index=False)
+        print("Saving complete.")
 
         random_samples = np.random.choice(df.shape[0], 10000, replace=False)
 
@@ -450,16 +454,15 @@ class SuREDataLoader(L.LightningDataModule):
         if not os.path.exists(self.genome_zipped_file_path):
             print(f"File does not exist. Downloading from {download_path}...")
             os.system(f"wget {download_path} -O {self.genome_zipped_file_path}")
-            if not os.path.exists(self.genome_zipped_file_path):
-                raise FileNotFoundError(f"Failed to download the file from {download_path}")
+            assert os.path.exists(self.genome_zipped_file_path)
             print("Download complete.")
         else:
             print("File already exists. Skipping download.")
         list_files(self.datasets_save_dir)
 
         # unzip the raw data and put it into the SuRE_data/genome_id directory
-        self.quoted_cur_datasets_save_dir = shlex.quote(self.cur_datasets_save_dir) # use shlex to correctly quote and escape string
-        os.system("unzip {} -d {}".format(self.quoted_genome_zipped_file_path, self.quoted_cur_datasets_save_dir))
+        self.cur_datasets_save_dir = shlex.quote(self.cur_datasets_save_dir) # use shlex to correctly quote and escape string
+        os.system("unzip {} -d {}".format(self.genome_zipped_file_path, self.cur_datasets_save_dir))
         list_files(self.cur_datasets_save_dir)
 
         self.fasta_file = shlex.quote(os.path.join(self.common_cache_dir, "hg19.fa")) # use shlex to correctly quote and escape string
