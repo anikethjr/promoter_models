@@ -197,6 +197,7 @@ class FluorescenceDataLoader(L.LightningDataModule):
             self.merged_cache_path = os.path.join(self.cache_dir, "merged.tsv")
 
         if not os.path.exists(self.merged_cache_path):
+            print("Processing sequencing data from Fluorescence Assay...")
             self.measurements = pd.read_csv(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv"))
             
             self.measurements["keep"] = True
@@ -208,10 +209,10 @@ class FluorescenceDataLoader(L.LightningDataModule):
             # divide the read counts by the total number of reads across sequences
             for col in self.measurements.columns:
                 if not (col.endswith("_sum") or col == "sequence"):
-                    print("Normalizing {}, sum before = {}".format(col, self.measurements[col].sum()))
+                    print("{}, sum before normalizing = {}".format(col, self.measurements[col].sum()))
                     self.measurements[col] = self.measurements[col] + 1.0 # pseudocount
                     self.measurements[col] = self.measurements[col] / self.measurements[col].sum() # normalize
-                    print("After normalizing {}, sum = {}".format(col, self.measurements[col].sum()))
+                    print("{}, sum after normalizing = {}".format(col, self.measurements[col].sum()))
             
             for cell in self.cell_names:
                 first_letter_of_cell_name = cell[:1]
@@ -292,6 +293,8 @@ class FluorescenceDataLoader(L.LightningDataModule):
             self.merged["is_test"].iloc[all_test_inds] = True
             
             self.merged.to_csv(self.merged_cache_path, sep="\t", index=False)
+
+            print("Finished processing sequencing data from Fluorescence Assay.")
         
         self.merged = pd.read_csv(self.merged_cache_path, sep="\t")
 
