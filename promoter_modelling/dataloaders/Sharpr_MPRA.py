@@ -5,6 +5,7 @@ import os
 import scipy.stats as stats
 from tqdm import tqdm
 import h5py
+import shlex
 
 import torch
 import torch.nn as nn
@@ -48,6 +49,7 @@ class SharprMPRADataset(Dataset):
 # class used to read, process and build train, val, test sets using the Sharpr MPRA dataset preprocessed by Movva et al. (2019)
 class SharprMPRADataLoader(L.LightningDataModule):
     def download_data(self):
+        self.data_dir = shlex.quote(self.data_dir)
         if not os.path.exists(self.data_dir):
             os.mkdir(self.data_dir)
         if not os.path.exists(os.path.join(self.data_dir, "train.hdf5")):

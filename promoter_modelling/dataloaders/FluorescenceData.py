@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.stats as stats
 from tqdm import tqdm
+import shlex
 
 import torch
 import torch.nn as nn
@@ -90,12 +91,15 @@ class FluorescenceDataset(Dataset):
 
 class FluorescenceDataLoader(L.LightningDataModule):    
     def download_data(self):
-        if not os.path.exists(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv")):
-            os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=15p6GhDop5BsUPryZ6pfKgwJ2XEVHRAYq' -O {}".format(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv")))
-            assert os.path.exists(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv"))
-        if not os.path.exists(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv")):
-            os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1kTfsZvsCz7EWUhl-UZgK0B31LtxJH4qG' -O {}".format(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv")))
-            assert os.path.exists(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv"))
+        self.cache_dir_counts = shlex.quote(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv"))
+        if not os.path.exists(self.cache_dir_counts):
+            os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=15p6GhDop5BsUPryZ6pfKgwJ2XEVHRAYq' -O {}".format(self.cache_dir_counts))
+            assert os.path.exists(self.cache_dir_counts)
+
+        self.cache_dir_seq_list = shlex.quote(os.path.join(self.cache_dir, "final_list_of_all_promoter_sequences_fixed.tsv"))
+        if not os.path.exists(self.cache_dir_seq_list):
+            os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1kTfsZvsCz7EWUhl-UZgK0B31LtxJH4qG' -O {}".format(self.cache_dir_seq_list))
+            assert os.path.exists(self.cache_dir_seq_list)
     
     def update_metrics(self, y_hat, y, loss, split):
         self.all_metrics[split]["{}_avg_epoch_loss".format(self.name)].update(loss)
@@ -193,6 +197,7 @@ class FluorescenceDataLoader(L.LightningDataModule):
             self.merged_cache_path = os.path.join(self.cache_dir, "merged.tsv")
 
         if not os.path.exists(self.merged_cache_path):
+            print("Processing sequencing data from Fluorescence Assay...")
             self.measurements = pd.read_csv(os.path.join(self.cache_dir, "Raw_Promoter_Counts.csv"))
             
             self.measurements["keep"] = True
@@ -204,10 +209,10 @@ class FluorescenceDataLoader(L.LightningDataModule):
             # divide the read counts by the total number of reads across sequences
             for col in self.measurements.columns:
                 if not (col.endswith("_sum") or col == "sequence"):
-                    print("Normalizing {}, sum before = {}".format(col, self.measurements[col].sum()))
+                    print("{}, sum before normalizing = {}".format(col, self.measurements[col].sum()))
                     self.measurements[col] = self.measurements[col] + 1.0 # pseudocount
                     self.measurements[col] = self.measurements[col] / self.measurements[col].sum() # normalize
-                    print("After normalizing {}, sum = {}".format(col, self.measurements[col].sum()))
+                    print("{}, sum after normalizing = {}".format(col, self.measurements[col].sum()))
             
             for cell in self.cell_names:
                 first_letter_of_cell_name = cell[:1]
@@ -288,6 +293,8 @@ class FluorescenceDataLoader(L.LightningDataModule):
             self.merged["is_test"].iloc[all_test_inds] = True
             
             self.merged.to_csv(self.merged_cache_path, sep="\t", index=False)
+
+            print("Finished processing sequencing data from Fluorescence Assay.")
         
         self.merged = pd.read_csv(self.merged_cache_path, sep="\t")
 

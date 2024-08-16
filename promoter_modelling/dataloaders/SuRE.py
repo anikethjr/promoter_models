@@ -7,6 +7,7 @@ import seaborn as sns
 import scipy.stats as stats
 from tqdm import tqdm
 import gc
+import shlex
 
 import torch
 import torch.nn as nn
@@ -106,17 +107,21 @@ def preprocess_file(file, fasta_file, cur_cache_dir, cur_datasets_save_dir, cur_
         # ...
         # 91-100
         # > 100        
-        print("Binning expression values")
+        #print("Binning expression values")
         for cell in ["K562", "HepG2"]:
-            print(cell)
-            df["{}_bin".format(cell)] = np.ceil(df["avg_{}_exp".format(cell)] / 10).astype(int)
-            df["{}_bin".format(cell)][df["{}_bin".format(cell)] > 10] = 11
+            print(f"Binning expression values for {cell}")
+            column_name = "{}_bin".format(cell)
+            df[column_name] = np.ceil(df["avg_{}_exp".format(cell)] / 10).astype(int)
+            df.loc[df[column_name] > 10, column_name] = 11
             
+            print("file, cell, bin_number, number_of_samples")
             for bin_num in range(0, 12):                
-                subset = df[df["{}_bin".format(cell)] == bin_num].reset_index(drop=True)
-                print("{} {} bin {} samples = {}".format(file, cell, bin_num, subset.shape[0]))
-                
-        df.to_csv(os.path.join(cur_cache_dir, file), sep="\t", index=False)        
+                subset = df[df[column_name] == bin_num].reset_index(drop=True)
+                print("{}, {}, bin {}, samples = {}".format(file, cell, bin_num, subset.shape[0]))
+
+        print("Saving dataframe to csv...")        
+        df.to_csv(os.path.join(cur_cache_dir, file), sep="\t", index=False)
+        print("Saving complete.")
 
         random_samples = np.random.choice(df.shape[0], 10000, replace=False)
 
@@ -400,7 +405,19 @@ def pad_collate(batch):
     seq = pad_sequence(seq, batch_first=True, padding_value=0)
 
     return seq, torch.vstack(targets)
-            
+
+def list_files(directory):
+    # List and sort all files in the directory
+    if os.path.exists(directory):
+        all_files = sorted(os.listdir(directory))
+        print(f"Files in {directory}:")
+        for file in all_files:
+            file_path = os.path.join(directory, file)
+            file_size = os.path.getsize(file_path)
+            print(f"Filename: {file}, Size: {file_size} bytes")
+    else:
+        print(f"Directory {directory} does not exist.")
+
 # class used to read, process and build train, val, test sets using the SuRE 2019 datasets
 # From GEO (https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE128325):
 # SuRE-seq assays with 8 libraries obtained from four heterozygous genomes from the 1000-genomes project, 
@@ -416,7 +433,7 @@ def pad_collate(batch):
 # and there are multiple data columns with read counts (depending on how many replicates were used) - 
 # SuRE*_*HEPG2* are for HepG2
 # other SuRE*_* columns are for K562
-class SuREDataLoader(L.LightningDataModule):
+class SuREDataLoader(L.LightningDataModule):        
     def download_data(self):
         download_path = None
         if self.genome_id == "SuRE42_HG02601":
@@ -430,16 +447,25 @@ class SuREDataLoader(L.LightningDataModule):
         else:
             raise Exception("ERROR: invalid genome specified. Must be one of SuRE42_HG02601, SuRE43_GM18983, SuRE44_HG01241 or SuRE45_HG03464")
 
-        genome_zipped_file_path = os.path.join(self.datasets_save_dir, self.genome_id + ".zip")
-        if not os.path.exists(genome_zipped_file_path):
-            os.system("wget {} -O {}".format(download_path, genome_zipped_file_path))
-            assert os.path.exists(genome_zipped_file_path)
+        # put the raw zipped data into the SuRE_data directory
+        self.genome_zipped_file_path = shlex.quote(os.path.join(self.datasets_save_dir, self.genome_id + ".zip")) # use shlex to correctly quote and escape string so that it can be safely used as a shell argument
 
-        if not os.path.exists(self.cur_datasets_save_dir):
-            os.system("unzip {}".format(genome_zipped_file_path))
-            assert os.path.exists(self.cur_datasets_save_dir)
+        print(f"Genome zipped file path: {self.genome_zipped_file_path}")
+        if not os.path.exists(self.genome_zipped_file_path):
+            print(f"File does not exist. Downloading from {download_path}...")
+            os.system(f"wget {download_path} -O {self.genome_zipped_file_path}")
+            assert os.path.exists(self.genome_zipped_file_path)
+            print("Download complete.")
+        else:
+            print("File already exists. Skipping download.")
+        list_files(self.datasets_save_dir)
 
-        self.fasta_file = os.path.join(self.common_cache_dir, "hg19.fa")
+        # unzip the raw data and put it into the SuRE_data/genome_id directory
+        self.cur_datasets_save_dir = shlex.quote(self.cur_datasets_save_dir) # use shlex to correctly quote and escape string
+        os.system("unzip {} -d {}".format(self.genome_zipped_file_path, self.cur_datasets_save_dir))
+        list_files(self.cur_datasets_save_dir)
+
+        self.fasta_file = shlex.quote(os.path.join(self.common_cache_dir, "hg19.fa")) # use shlex to correctly quote and escape string
         if not os.path.exists(self.fasta_file):
             os.system("wget https://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz -O {}".format(self.fasta_file + ".gz"))
             os.system("gunzip {}".format(self.fasta_file + ".gz"))
@@ -564,17 +590,22 @@ class SuREDataLoader(L.LightningDataModule):
         self.cache_dir = cache_dir
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)
-        self.cur_cache_dir = os.path.join(self.cache_dir, genome_id)
+        self.cur_cache_dir = os.path.join(self.cache_dir, self.genome_id)
         if not os.path.exists(self.cur_cache_dir):
             os.mkdir(self.cur_cache_dir)
         self.common_cache_dir = common_cache_dir
 
         # datasets_save_dir is the directory where we will save the raw data
         self.datasets_save_dir = datasets_save_dir
+        #print(datasets_save_dir)
+        #print(self.datasets_save_dir)
         if not os.path.exists(self.datasets_save_dir):
             os.mkdir(self.datasets_save_dir)
-        self.cur_datasets_save_dir = os.path.join(datasets_save_dir, genome_id)
-        
+       
+        self.cur_datasets_save_dir = os.path.join(self.datasets_save_dir, self.genome_id)
+        if not os.path.exists(self.cur_datasets_save_dir):
+            os.mkdir(self.cur_datasets_save_dir)
+
         self.cur_stats_save_dir = os.path.join(self.cur_cache_dir, "stats")
         if not os.path.exists(self.cur_stats_save_dir):
             os.mkdir(self.cur_stats_save_dir)
@@ -592,6 +623,9 @@ class SuREDataLoader(L.LightningDataModule):
             self.fasta_extractor = fasta_utils.FastaStringExtractor(self.fasta_file)
 
             self.all_files = sorted(os.listdir(self.cur_datasets_save_dir))
+            #print("Files in all_files:")
+            #for file in self.all_files:
+            #    print(file)
 
             # preprocess each file - uncomment following lines to run in parallel
     #         Parallel(n_jobs=-1)(delayed(preprocess_file)(file, \

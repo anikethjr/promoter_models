@@ -8,6 +8,7 @@ import scipy.stats as stats
 from tqdm import tqdm
 import gc
 from Bio.Seq import Seq
+import shlex
 
 import torch
 import torch.nn as nn
@@ -82,10 +83,10 @@ class STARRSeqDataLoader(L.LightningDataModule):
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)
         
-        self.K562_peaks_bed_path = os.path.join(self.cache_dir, "K562_repMerged_starrpeaker.peak.final.bed")
-        self.HepG2_peaks_bed_path = os.path.join(self.cache_dir, "HepG2_repMerged_starrpeaker.peak.final.bed")
-        self.fasta_file = os.path.join(self.common_cache_dir, "hg38.fa")
-        
+        self.K562_peaks_bed_path = shlex.quote(os.path.join(self.cache_dir, "K562_repMerged_starrpeaker.peak.final.bed"))
+        self.HepG2_peaks_bed_path = shlex.quote(os.path.join(self.cache_dir, "HepG2_repMerged_starrpeaker.peak.final.bed"))
+        self.fasta_file = shlex.quote(os.path.join(self.common_cache_dir, "hg38.fa"))
+
         if not os.path.exists(self.K562_peaks_bed_path):
             os.system("wget 'https://www.encodeproject.org/files/ENCFF045TVA/@@download/ENCFF045TVA.bed.gz' -O {}".format(self.K562_peaks_bed_path + ".gz"))
             os.system("gunzip {}".format(self.K562_peaks_bed_path  + ".gz"))

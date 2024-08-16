@@ -8,6 +8,7 @@ import scipy.stats as stats
 from tqdm import tqdm
 import joblib
 import kipoiseq
+import shlex
 
 import torch
 import torch.nn as nn
@@ -241,7 +242,7 @@ class ENCODETFChIPSeqDataLoader(L.LightningDataModule):
         self.datasets_save_dir = datasets_save_dir
         assert os.path.exists(self.datasets_save_dir), "ENCODE TF-ChIP-Seq datasets not found. Please download them first."
         
-        self.fasta_file = os.path.join(self.common_cache_dir, "hg38.fa")
+        self.fasta_file = shlex.quote(os.path.join(self.common_cache_dir, "hg38.fa"))
         if not os.path.exists(self.fasta_file):
             os.system("wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz -O {}".format(self.fasta_file + ".gz"))
             os.system("gunzip {}".format(self.fasta_file + ".gz"))

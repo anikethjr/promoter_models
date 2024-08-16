@@ -8,6 +8,7 @@ import scipy.stats as stats
 from tqdm import tqdm
 import gc
 from Bio.Seq import Seq
+import shlex
 
 import torch
 import torch.nn as nn
@@ -92,10 +93,10 @@ class lentiMPRADataLoader(L.LightningDataModule):
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)
         
-        self.large_scale_positions_path = os.path.join(self.cache_dir, "large_scale_positions.ods")
-        self.large_scale_exps_path = os.path.join(self.cache_dir, "large_scale_exps.ods")
-        self.designed_sequences_path = os.path.join(self.cache_dir, "designed_sequences.ods")
-        self.designed_sequences_exps_path = os.path.join(self.cache_dir, "designed_sequences_exps.ods")
+        self.large_scale_positions_path = shlex.quote(os.path.join(self.cache_dir, "large_scale_positions.ods"))
+        self.large_scale_exps_path = shlex.quote(os.path.join(self.cache_dir, "large_scale_exps.ods"))
+        self.designed_sequences_path = shlex.quote(os.path.join(self.cache_dir, "designed_sequences.ods"))
+        self.designed_sequences_exps_path = shlex.quote(os.path.join(self.cache_dir, "designed_sequences_exps.ods"))
 
         if not os.path.exists(self.large_scale_positions_path):
             os.system("wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1ME80jtw2QGt4nUo_pfNVktyt-zv9EYvg' -O {}".format(self.large_scale_positions_path))
